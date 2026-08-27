@@ -3165,3 +3165,320 @@ html.nexoweb-oscuro .menu-mas-movil-grid button.activo {
     grid-template-columns: 1fr 1fr;
   }
 }
+
+
+/* ============================================================
+   NEXOWEB v1.1.0
+   ESTADOS DE CARGA, CREACIÓN SEGURA Y ELIMINACIÓN
+============================================================ */
+
+button:disabled,
+input:disabled,
+select:disabled,
+textarea:disabled {
+  cursor: not-allowed;
+  opacity: .62;
+}
+
+.boton-login,
+.boton-guardar-acuario {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.login-card .boton-login {
+  width: 100%;
+  margin-top: 12px;
+}
+
+.spinner-mini {
+  width: 16px;
+  height: 16px;
+  display: inline-block;
+  flex: 0 0 auto;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: nexoweb-girar .75s linear infinite;
+}
+
+@keyframes nexoweb-girar {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.version-login {
+  margin-top: 15px;
+  text-align: center;
+  color: #98a2b3;
+  font-size: 10px;
+}
+
+/* MENSAJE DENTRO DEL MODAL */
+
+.mensaje-modal {
+  margin-bottom: 15px;
+  padding: 12px 13px;
+  border-radius: 11px;
+  border: 1px solid #d0d5dd;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.mensaje-modal.error {
+  color: #b42318;
+  background: #fef3f2;
+  border-color: #fecdca;
+}
+
+.mensaje-modal.advertencia {
+  color: #b54708;
+  background: #fffaeb;
+  border-color: #fedf89;
+}
+
+.mensaje-modal.info {
+  color: #344054;
+  background: #f8fafc;
+}
+
+/* PROGRESO CREACIÓN */
+
+.progreso-creacion {
+  margin-bottom: 16px;
+  padding: 14px;
+  border-radius: 13px;
+  border: 1px solid #c7d7fe;
+  background: #eef4ff;
+}
+
+.progreso-creacion-cabecera {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.progreso-creacion-cabecera strong,
+.progreso-creacion-cabecera small {
+  display: block;
+}
+
+.progreso-creacion-cabecera small {
+  margin-top: 2px;
+  color: #667085;
+  font-size: 10px;
+}
+
+.pasos-creacion {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 7px;
+  margin-top: 12px;
+}
+
+.paso {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px;
+  color: #98a2b3;
+  background: rgba(255, 255, 255, .62);
+  border-radius: 9px;
+  font-size: 10px;
+}
+
+.paso > span {
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: #eaecf0;
+  font-weight: 800;
+}
+
+.paso.activo {
+  color: #3538cd;
+  background: #fff;
+  font-weight: 700;
+}
+
+.paso.activo > span {
+  color: #fff;
+  background: #3538cd;
+}
+
+.paso.completado {
+  color: #027a48;
+  background: #ecfdf3;
+}
+
+.paso.completado > span {
+  color: #fff;
+  background: #12b76a;
+}
+
+.form-crear-acuario.guardando
+  .asistente-creacion button,
+.form-crear-acuario.guardando
+  .portada-creacion input,
+.form-crear-acuario.guardando
+  .campo-formulario input,
+.form-crear-acuario.guardando
+  .campo-formulario select,
+.form-crear-acuario.guardando
+  .campo-formulario textarea {
+  pointer-events: none;
+  opacity: .58;
+}
+
+/* TARJETAS / MENÚ */
+
+.tarjeta-acuario {
+  position: relative;
+}
+
+.tarjeta-acuario-acciones {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.badge-duplicado {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 4px 7px;
+  border-radius: 20px;
+  color: #b54708;
+  background: #fff8e8;
+  border: 1px solid #fedf89;
+  font-size: 8px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.menu-tarjeta-wrap {
+  position: relative;
+}
+
+.boton-menu-tarjeta {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid #eaecf0;
+  border-radius: 9px;
+  color: #475467;
+  background: #fff;
+  font-size: 20px;
+  line-height: 1;
+}
+
+.boton-menu-tarjeta:hover {
+  background: #f8fafb;
+}
+
+.menu-tarjeta {
+  position: absolute;
+  z-index: 50;
+  top: 38px;
+  right: 0;
+  width: 215px;
+  padding: 6px;
+  background: #fff;
+  border: 1px solid #eaecf0;
+  border-radius: 11px;
+  box-shadow: 0 14px 35px rgba(16, 24, 40, .14);
+}
+
+.menu-tarjeta button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  border: none;
+  background: transparent;
+  padding: 10px;
+  border-radius: 8px;
+  text-align: left;
+  color: #344054;
+  font-size: 11px;
+}
+
+.menu-tarjeta button:hover {
+  background: #f8fafb;
+}
+
+.menu-tarjeta button.peligro {
+  color: #b42318;
+}
+
+.menu-tarjeta button.peligro:hover {
+  background: #fef3f2;
+}
+
+/* MODO OSCURO */
+
+html.nexoweb-oscuro .mensaje-modal.info,
+html.nexoweb-oscuro .progreso-creacion {
+  background: #202830;
+  color: #edf2f7;
+  border-color: #384552;
+}
+
+html.nexoweb-oscuro .paso {
+  background: #171d23;
+}
+
+html.nexoweb-oscuro .boton-menu-tarjeta,
+html.nexoweb-oscuro .menu-tarjeta {
+  background: #202830;
+  color: #edf2f7;
+  border-color: #384552;
+}
+
+html.nexoweb-oscuro .menu-tarjeta button {
+  color: #edf2f7;
+}
+
+html.nexoweb-oscuro .menu-tarjeta button:hover {
+  background: #28323c;
+}
+
+html.nexoweb-oscuro .menu-tarjeta button.peligro {
+  color: #fda29b;
+}
+
+/* MÓVIL */
+
+@media (max-width: 760px) {
+  .tarjeta-acuario-acciones {
+    gap: 4px;
+  }
+
+  .badge-duplicado {
+    max-width: 88px;
+    text-align: center;
+    line-height: 1.15;
+  }
+
+  .menu-tarjeta {
+    width: 205px;
+  }
+
+  .pasos-creacion {
+    gap: 5px;
+  }
+
+  .paso {
+    flex-direction: column;
+    justify-content: center;
+    text-align: center;
+    padding: 7px 4px;
+  }
+}

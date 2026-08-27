@@ -1,9 +1,11 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from './lib/supabase.js'
 import './App.css'
 import ModulosExtras from './ModulosExtras.jsx'
 import GestionAvanzada, { ResumenInteligente } from './GestionAvanzada.jsx'
 import { subirImagenPublica, formatoBytes } from './utilsImagenes.js'
+
+const NEXOWEB_VERSION = '1.1.0'
 
 function App() {
   /* =========================================================
@@ -15,6 +17,7 @@ function App() {
   const [password, setPassword] = useState('')
   const [mensaje, setMensaje] = useState('')
   const [cargando, setCargando] = useState(true)
+  const [iniciandoSesion, setIniciandoSesion] = useState(false)
 
   /* =========================================================
      ACUARIOS
@@ -30,6 +33,11 @@ function App() {
 
   const [mostrarModalAcuario, setMostrarModalAcuario] = useState(false)
   const [guardandoAcuario, setGuardandoAcuario] = useState(false)
+  const guardandoAcuarioRef = useRef(false)
+  const [mensajeAcuario, setMensajeAcuario] = useState('')
+  const [progresoCreacion, setProgresoCreacion] = useState('')
+  const [menuTarjetaAcuario, setMenuTarjetaAcuario] = useState(null)
+  const [eliminandoAcuarioId, setEliminandoAcuarioId] = useState(null)
   const [fotoPortadaArchivo, setFotoPortadaArchivo] = useState(null)
   const [fotoPortadaPreview, setFotoPortadaPreview] = useState('')
   const [modoOscuro, setModoOscuro] = useState(() => localStorage.getItem('nexoweb-tema') === 'oscuro')
@@ -379,15 +387,25 @@ function App() {
 
   const iniciarSesion = async (e) => {
     e.preventDefault()
+
+    if (iniciandoSesion) return
+
     setMensaje('')
+    setIniciandoSesion(true)
 
-    const { error } = await supabase.auth.signInWithPassword({
-      email: email.trim(),
-      password,
-    })
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      })
 
-    if (error) {
-      setMensaje(`Error: ${error.message}`)
+      if (error) {
+        setMensaje(`❌ No se pudo iniciar sesión: ${error.message}`)
+      }
+    } catch (error) {
+      setMensaje(`❌ No se pudo iniciar sesión: ${error.message}`)
+    } finally {
+      setIniciandoSesion(false)
     }
   }
 
@@ -485,6 +503,9 @@ function App() {
 
     setFotoPortadaArchivo(null)
     setFotoPortadaPreview('')
+    setMensajeAcuario('')
+    setProgresoCreacion('')
+    guardandoAcuarioRef.current = false
     setMostrarModalAcuario(true)
   }
 
@@ -529,13 +550,42 @@ function App() {
 
     if (!session?.user?.id) return
 
-    if (!formAcuario.nombre.trim()) {
-      setMensaje('Debes ingresar el nombre del acuario.')
+    // Protección real contra doble clic / doble envío.
+    if (guardandoAcuarioRef.current) return
+
+    const nombreLimpio = formAcuario.nombre.trim()
+
+    if (!nombreLimpio) {
+      setMensajeAcuario('⚠️ Debes ingresar el nombre del acuario.')
       return
     }
 
+    const existeMismoNombre = acuarios.some(
+      (item) =>
+        item.nombre?.trim().toLowerCase() ===
+        nombreLimpio.toLowerCase()
+    )
+
+    if (existeMismoNombre) {
+      const continuar = window.confirm(
+        `Ya existe un acuario llamado "${nombreLimpio}".\n\n` +
+        'Si estás creando uno diferente puedes continuar. ' +
+        'Si fue un intento anterior, pulsa Cancelar.'
+      )
+
+      if (!continuar) {
+        setMensajeAcuario(
+          'ℹ️ Creación cancelada para evitar un posible duplicado.'
+        )
+        return
+      }
+    }
+
+    guardandoAcuarioRef.current = true
     setGuardandoAcuario(true)
     setMensaje('')
+    setMensajeAcuario('')
+    setProgresoCreacion('guardando_datos')
 
     try {
       const { data: creado, error } = await supabase
@@ -543,7 +593,7 @@ function App() {
         .insert([
           {
             usuario_id: session.user.id,
-            nombre: formAcuario.nombre.trim(),
+            nombre: nombreLimpio,
             descripcion: formAcuario.descripcion.trim() || null,
             volumen_litros: numeroONull(formAcuario.volumen_litros),
             largo_cm: numeroONull(formAcuario.largo_cm),
@@ -554,7 +604,9 @@ function App() {
             ubicacion: formAcuario.ubicacion || null,
             exposicion_solar: formAcuario.exposicion_solar || null,
             fecha_inicio: formAcuario.fecha_inicio || null,
-            temperatura_objetivo: numeroONull(formAcuario.temperatura_objetivo),
+            temperatura_objetivo: numeroONull(
+              formAcuario.temperatura_objetivo
+            ),
             costo_inicial: numeroONull(formAcuario.costo_inicial),
             estado: 'activo',
           },
@@ -567,6 +619,8 @@ function App() {
       let acuarioFinal = creado
 
       if (fotoPortadaArchivo) {
+        setProgresoCreacion('procesando_foto')
+
         const subida = await subirImagenPublica({
           archivo: fotoPortadaArchivo,
           usuarioId: session.user.id,
@@ -577,30 +631,232 @@ function App() {
           quality: 0.72,
         })
 
-        const { data: actualizado, error: errorPortada } = await supabase
-          .from('acuarios')
-          .update({
-            foto_portada_url: subida.url,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', creado.id)
-          .select()
-          .single()
+        const { data: actualizado, error: errorPortada } =
+          await supabase
+            .from('acuarios')
+            .update({
+              foto_portada_url: subida.url,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', creado.id)
+            .select()
+            .single()
 
         if (errorPortada) throw errorPortada
+
         acuarioFinal = actualizado
       }
 
-      setAcuarios((anterior) => [acuarioFinal, ...anterior])
-      setMostrarModalAcuario(false)
+      setProgresoCreacion('finalizando')
+
+      setAcuarios((anterior) => [
+        acuarioFinal,
+        ...anterior.filter(
+          (item) => item.id !== acuarioFinal.id
+        ),
+      ])
+
       setFotoPortadaArchivo(null)
       setFotoPortadaPreview('')
-      setMensaje('✅ Acuario creado correctamente.')
+      setMensajeAcuario('')
+
+      // Pequeña pausa visual para que el usuario vea que terminó.
+      await new Promise((resolve) => setTimeout(resolve, 350))
+
+      setMostrarModalAcuario(false)
+      setMensaje(
+        `✅ "${acuarioFinal.nombre}" fue creado correctamente.`
+      )
+
+      setProgresoCreacion('')
     } catch (error) {
-      setMensaje(`Error: ${error.message}`)
+      console.error(error)
+
+      setMensajeAcuario(
+        `❌ No se pudo crear el acuario: ${error.message}`
+      )
+
+      setProgresoCreacion('error')
     } finally {
+      guardandoAcuarioRef.current = false
       setGuardandoAcuario(false)
     }
+  }
+
+  const limpiarStorageAcuario = async (acuarioId) => {
+    if (!session?.user?.id || !acuarioId) return
+
+    const base = `${session.user.id}/${acuarioId}`
+
+    try {
+      // Fotos antiguas guardadas directamente en la carpeta del acuario.
+      const { data: raiz } = await supabase.storage
+        .from('fotos-acuario')
+        .list(base, {
+          limit: 1000,
+        })
+
+      const archivosRaiz = (raiz ?? [])
+        .filter(
+          (item) =>
+            item.name &&
+            item.id &&
+            !['portada', 'fotos'].includes(item.name)
+        )
+        .map((item) => `${base}/${item.name}`)
+
+      // Portadas nuevas.
+      const { data: portadas } = await supabase.storage
+        .from('fotos-acuario')
+        .list(`${base}/portada`, {
+          limit: 1000,
+        })
+
+      const archivosPortada = (portadas ?? [])
+        .filter((item) => item.name && item.id)
+        .map(
+          (item) =>
+            `${base}/portada/${item.name}`
+        )
+
+      // Fotografías que utilicen la nueva estructura /fotos.
+      const { data: fotos } = await supabase.storage
+        .from('fotos-acuario')
+        .list(`${base}/fotos`, {
+          limit: 1000,
+        })
+
+      const archivosFotos = (fotos ?? [])
+        .filter((item) => item.name && item.id)
+        .map(
+          (item) =>
+            `${base}/fotos/${item.name}`
+        )
+
+      const archivos = [
+        ...archivosRaiz,
+        ...archivosPortada,
+        ...archivosFotos,
+      ]
+
+      if (archivos.length > 0) {
+        await supabase.storage
+          .from('fotos-acuario')
+          .remove(archivos)
+      }
+    } catch (error) {
+      // La eliminación del registro principal no debe quedar bloqueada
+      // si Storage no tiene archivos o devuelve un error.
+      console.warn(
+        'No se pudieron limpiar todos los archivos de Storage:',
+        error
+      )
+    }
+  }
+
+  const eliminarAcuarioDefinitivamente = async (acuario) => {
+    if (!acuario?.id || eliminandoAcuarioId) return
+
+    setMenuTarjetaAcuario(null)
+
+    const confirmacion = window.prompt(
+      `⚠️ ELIMINAR DEFINITIVAMENTE\n\n` +
+      `"${acuario.nombre}" y toda su información relacionada serán eliminados.\n\n` +
+      'Para continuar escribe exactamente:\nELIMINAR'
+    )
+
+    if (confirmacion !== 'ELIMINAR') {
+      if (confirmacion !== null) {
+        setMensaje(
+          'ℹ️ No se eliminó el acuario porque la confirmación no coincidió.'
+        )
+      }
+      return
+    }
+
+    const ultimaConfirmacion = window.confirm(
+      `Última confirmación:\n\n` +
+      `¿Eliminar definitivamente "${acuario.nombre}"?\n\n` +
+      'Esta acción no se puede deshacer.'
+    )
+
+    if (!ultimaConfirmacion) return
+
+    setEliminandoAcuarioId(acuario.id)
+    setMensaje('')
+
+    try {
+      await limpiarStorageAcuario(acuario.id)
+
+      const { error } = await supabase
+        .from('acuarios')
+        .delete()
+        .eq('id', acuario.id)
+        .eq('usuario_id', session.user.id)
+
+      if (error) throw error
+
+      setAcuarios((lista) =>
+        lista.filter((item) => item.id !== acuario.id)
+      )
+
+      setMensaje(
+        `✅ "${acuario.nombre}" fue eliminado definitivamente.`
+      )
+    } catch (error) {
+      console.error(error)
+      setMensaje(
+        `❌ No se pudo eliminar el acuario: ${error.message}`
+      )
+    } finally {
+      setEliminandoAcuarioId(null)
+    }
+  }
+
+  const archivarAcuarioDesdeLista = async (acuario) => {
+    if (!acuario?.id) return
+
+    setMenuTarjetaAcuario(null)
+
+    const nuevoEstado =
+      acuario.estado === 'archivado'
+        ? 'activo'
+        : 'archivado'
+
+    const texto =
+      nuevoEstado === 'archivado'
+        ? `¿Archivar "${acuario.nombre}"? No se borrará su historial.`
+        : `¿Reactivar "${acuario.nombre}"?`
+
+    if (!window.confirm(texto)) return
+
+    const { data, error } = await supabase
+      .from('acuarios')
+      .update({
+        estado: nuevoEstado,
+        archivado_en:
+          nuevoEstado === 'archivado'
+            ? new Date().toISOString()
+            : null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', acuario.id)
+      .eq('usuario_id', session.user.id)
+      .select()
+      .single()
+
+    if (error) {
+      setMensaje(`❌ Error: ${error.message}`)
+      return
+    }
+
+    actualizarAcuarioLocal(data)
+
+    setMensaje(
+      nuevoEstado === 'archivado'
+        ? `✅ "${acuario.nombre}" fue archivado.`
+        : `✅ "${acuario.nombre}" fue reactivado.`
+    )
   }
 
   const abrirAcuario = (acuario) => {
@@ -3374,6 +3630,29 @@ function App() {
     )
   }
 
+  const idsPosiblesDuplicados = useMemo(() => {
+    const grupos = new Map()
+
+    acuarios.forEach((acuario) => {
+      const nombre = acuario.nombre?.trim().toLowerCase() || ''
+      const volumen = String(acuario.volumen_litros ?? '')
+      const tipo = acuario.tipo?.trim().toLowerCase() || ''
+      const clave = `${nombre}|${volumen}|${tipo}`
+
+      if (!grupos.has(clave)) {
+        grupos.set(clave, [])
+      }
+
+      grupos.get(clave).push(acuario.id)
+    })
+
+    return new Set(
+      [...grupos.values()]
+        .filter((ids) => ids.length > 1)
+        .flat()
+    )
+  }, [acuarios])
+
   /* =========================================================
      CARGANDO
   ========================================================= */
@@ -3422,6 +3701,7 @@ function App() {
                   e.target.value
                 )
               }
+              disabled={iniciandoSesion}
               required
             />
 
@@ -3437,22 +3717,36 @@ function App() {
                   e.target.value
                 )
               }
+              disabled={iniciandoSesion}
               required
             />
 
             <button
-              className="boton-principal"
+              className="boton-principal boton-login"
+              disabled={iniciandoSesion}
             >
-              Iniciar sesión
+              {iniciandoSesion ? (
+                <>
+                  <span className="spinner-mini" />
+                  Iniciando sesión...
+                </>
+              ) : (
+                'Iniciar sesión'
+              )}
             </button>
           </form>
 
           <button
             className="boton-secundario"
             onClick={crearCuenta}
+            disabled={iniciandoSesion}
           >
             Crear cuenta
           </button>
+
+          <div className="version-login">
+            NexoWeb · v{NEXOWEB_VERSION}
+          </div>
 
           {mensaje && (
             <div className="mensaje">
@@ -5514,7 +5808,9 @@ function App() {
       <header className="topbar">
         <div>
           <h1>NexoWeb</h1>
-          <p>Mis acuarios</p>
+          <p>
+            Mis acuarios · v{NEXOWEB_VERSION}
+          </p>
         </div>
 
         <button
@@ -5572,10 +5868,75 @@ function App() {
                       🐠
                     </div>
 
-                    <span className="estado-acuario">
-                      {acuario.estado ||
-                        'activo'}
-                    </span>
+                    <div className="tarjeta-acuario-acciones">
+                      {idsPosiblesDuplicados.has(acuario.id) && (
+                        <span className="badge-duplicado">
+                          Posible duplicado
+                        </span>
+                      )}
+
+                      <span className="estado-acuario">
+                        {acuario.estado ||
+                          'activo'}
+                      </span>
+
+                      <div className="menu-tarjeta-wrap">
+                        <button
+                          type="button"
+                          className="boton-menu-tarjeta"
+                          aria-label={`Opciones de ${acuario.nombre}`}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setMenuTarjetaAcuario(
+                              menuTarjetaAcuario === acuario.id
+                                ? null
+                                : acuario.id
+                            )
+                          }}
+                        >
+                          ⋮
+                        </button>
+
+                        {menuTarjetaAcuario === acuario.id && (
+                          <div className="menu-tarjeta">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                abrirAcuario(acuario)
+                                setSeccionActiva('configuracion')
+                                setMenuTarjetaAcuario(null)
+                              }}
+                            >
+                              🛠️ Editar
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() =>
+                                archivarAcuarioDesdeLista(acuario)
+                              }
+                            >
+                              {acuario.estado === 'archivado'
+                                ? '♻️ Reactivar'
+                                : '📦 Archivar'}
+                            </button>
+
+                            <button
+                              type="button"
+                              className="peligro"
+                              disabled={
+                                eliminandoAcuarioId === acuario.id
+                              }
+                              onClick={() =>
+                                eliminarAcuarioDefinitivamente(acuario)
+                              }
+                            >
+                              🗑️ Eliminar definitivamente
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
 
                   <h3>
@@ -5609,13 +5970,18 @@ function App() {
 
                   <button
                     className="boton-entrar-acuario"
+                    disabled={
+                      eliminandoAcuarioId === acuario.id
+                    }
                     onClick={() =>
                       abrirAcuario(
                         acuario
                       )
                     }
                   >
-                    Abrir acuario
+                    {eliminandoAcuarioId === acuario.id
+                      ? 'Eliminando...'
+                      : 'Abrir acuario'}
                   </button>
                 </article>
               )
@@ -5634,11 +6000,14 @@ function App() {
 
               <button
                 className="boton-cerrar-modal"
-                onClick={() =>
-                  setMostrarModalAcuario(
-                    false
-                  )
-                }
+                disabled={guardandoAcuario}
+                onClick={() => {
+                  if (!guardandoAcuario) {
+                    setMostrarModalAcuario(false)
+                    setMensajeAcuario('')
+                    setProgresoCreacion('')
+                  }
+                }}
               >
                 ×
               </button>
@@ -5648,7 +6017,88 @@ function App() {
               onSubmit={
                 guardarAcuario
               }
+              aria-busy={guardandoAcuario}
+              className={
+                guardandoAcuario
+                  ? 'form-crear-acuario guardando'
+                  : 'form-crear-acuario'
+              }
             >
+              {mensajeAcuario && (
+                <div
+                  className={`mensaje-modal ${
+                    mensajeAcuario.startsWith('❌')
+                      ? 'error'
+                      : mensajeAcuario.startsWith('⚠️')
+                      ? 'advertencia'
+                      : 'info'
+                  }`}
+                >
+                  {mensajeAcuario}
+                </div>
+              )}
+
+              {guardandoAcuario && (
+                <div className="progreso-creacion">
+                  <div className="progreso-creacion-cabecera">
+                    <span className="spinner-mini" />
+                    <div>
+                      <strong>Creando acuario...</strong>
+                      <small>
+                        No cierres esta ventana ni pulses Guardar otra vez.
+                      </small>
+                    </div>
+                  </div>
+
+                  <div className="pasos-creacion">
+                    <div
+                      className={
+                        ['guardando_datos', 'procesando_foto', 'finalizando']
+                          .includes(progresoCreacion)
+                          ? 'paso activo'
+                          : 'paso'
+                      }
+                    >
+                      <span>
+                        {['procesando_foto', 'finalizando'].includes(
+                          progresoCreacion
+                        )
+                          ? '✓'
+                          : '1'}
+                      </span>
+                      Datos
+                    </div>
+
+                    <div
+                      className={
+                        progresoCreacion === 'procesando_foto'
+                          ? 'paso activo'
+                          : progresoCreacion === 'finalizando'
+                          ? 'paso completado'
+                          : 'paso'
+                      }
+                    >
+                      <span>
+                        {progresoCreacion === 'finalizando'
+                          ? '✓'
+                          : '2'}
+                      </span>
+                      Foto
+                    </div>
+
+                    <div
+                      className={
+                        progresoCreacion === 'finalizando'
+                          ? 'paso activo'
+                          : 'paso'
+                      }
+                    >
+                      <span>3</span>
+                      Finalizar
+                    </div>
+                  </div>
+                </div>
+              )}
               <div className="asistente-creacion">
                 <strong>¿Qué estás creando?</strong>
                 <div className="tipos-creacion">
@@ -5934,22 +6384,30 @@ function App() {
                 <button
                   type="button"
                   className="boton-cancelar"
-                  onClick={() =>
-                    setMostrarModalAcuario(
-                      false
-                    )
-                  }
+                  disabled={guardandoAcuario}
+                  onClick={() => {
+                    if (!guardandoAcuario) {
+                      setMostrarModalAcuario(false)
+                      setMensajeAcuario('')
+                      setProgresoCreacion('')
+                    }
+                  }}
                 >
                   Cancelar
                 </button>
 
                 <button
-                  className="boton-principal"
-                  disabled={
-                    guardandoAcuario
-                  }
+                  className="boton-principal boton-guardar-acuario"
+                  disabled={guardandoAcuario}
                 >
-                  Guardar
+                  {guardandoAcuario ? (
+                    <>
+                      <span className="spinner-mini" />
+                      Creando...
+                    </>
+                  ) : (
+                    'Guardar'
+                  )}
                 </button>
               </div>
             </form>
