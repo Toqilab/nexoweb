@@ -5,7 +5,54 @@ import ModulosExtras from './ModulosExtras.jsx'
 import GestionAvanzada, { ResumenInteligente } from './GestionAvanzada.jsx'
 import { subirImagenPublica, formatoBytes } from './utilsImagenes.js'
 
-const NEXOWEB_VERSION = '1.2.1'
+const NEXOWEB_VERSION = '1.3.0'
+
+const portadaDefaultAcuario = (tipo = '') => {
+  const valor = String(tipo || '').toLowerCase()
+
+  if (valor.includes('plant')) {
+    return {
+      clase: 'portada-plantado',
+      emoji: '🌿',
+      titulo: 'Acuario plantado',
+      subtitulo: 'Naturaleza acuática',
+    }
+  }
+
+  if (valor.includes('estanque')) {
+    return {
+      clase: 'portada-estanque',
+      emoji: '🏞️',
+      titulo: 'Estanque',
+      subtitulo: 'Ambiente exterior',
+    }
+  }
+
+  if (valor.includes('gamb')) {
+    return {
+      clase: 'portada-gambario',
+      emoji: '🦐',
+      titulo: 'Gambario',
+      subtitulo: 'Hábitat para camarones',
+    }
+  }
+
+  if (valor.includes('cría') || valor.includes('cria')) {
+    return {
+      clase: 'portada-cria',
+      emoji: '🐟',
+      titulo: 'Acuario de cría',
+      subtitulo: 'Seguimiento de reproducción',
+    }
+  }
+
+  return {
+    clase: 'portada-acuario',
+    emoji: '🐠',
+    titulo: 'Acuario',
+    subtitulo: 'Tu ecosistema acuático',
+  }
+}
 
 function App() {
   /* =========================================================
@@ -376,6 +423,126 @@ function App() {
     )
 
     return fecha.toISOString()
+  }
+
+
+  const diasEntreFechas = (inicio, fin) => {
+    const [ai, mi, di] = inicio.split('-').map(Number)
+    const [af, mf, df] = fin.split('-').map(Number)
+
+    const fechaInicio = new Date(ai, mi - 1, di)
+    const fechaFin = new Date(af, mf - 1, df)
+
+    fechaInicio.setHours(0, 0, 0, 0)
+    fechaFin.setHours(0, 0, 0, 0)
+
+    return Math.floor(
+      (fechaFin - fechaInicio) / 86400000
+    )
+  }
+
+  const rutinaCorrespondeFecha = (rutina, fechaTexto) => {
+    if (!rutina?.activa || !rutina?.fecha_inicio) {
+      return false
+    }
+
+    if (fechaTexto < rutina.fecha_inicio) {
+      return false
+    }
+
+    if (rutina.fecha_fin && fechaTexto > rutina.fecha_fin) {
+      return false
+    }
+
+    const transcurridos = diasEntreFechas(
+      rutina.fecha_inicio,
+      fechaTexto
+    )
+
+    const [anio, mes, dia] =
+      fechaTexto.split('-').map(Number)
+
+    const fecha = new Date(anio, mes - 1, dia)
+
+    if (
+      rutina.frecuencia === 'diaria' ||
+      rutina.frecuencia === 'cada_x_dias'
+    ) {
+      return (
+        transcurridos %
+          Math.max(1, Number(rutina.intervalo) || 1) ===
+        0
+      )
+    }
+
+    if (rutina.frecuencia === 'semanal') {
+      const dias = rutina.dias_semana?.length
+        ? rutina.dias_semana
+        : []
+
+      return dias.includes(fecha.getDay())
+    }
+
+    if (rutina.frecuencia === 'mensual') {
+      return (
+        fecha.getDate() ===
+        Number(rutina.dia_mes || 1)
+      )
+    }
+
+    return false
+  }
+
+  const materializarRutinasHoy = async () => {
+    if (!acuarioSeleccionado?.id) return
+
+    const hoyTexto = fechaHoy()
+
+    const { data: rutinas, error } = await supabase
+      .from('rutinas_acuario')
+      .select('*')
+      .eq('acuario_id', acuarioSeleccionado.id)
+      .eq('activa', true)
+
+    if (error) return
+
+    const aplicables = (rutinas ?? []).filter((rutina) =>
+      rutinaCorrespondeFecha(rutina, hoyTexto)
+    )
+
+    for (const rutina of aplicables) {
+      const { data: existente } = await supabase
+        .from('tareas_acuario')
+        .select('id')
+        .eq('rutina_id', rutina.id)
+        .eq('fecha_rutina', hoyTexto)
+        .maybeSingle()
+
+      if (existente?.id) continue
+
+      await supabase
+        .from('tareas_acuario')
+        .insert([
+          {
+            acuario_id: acuarioSeleccionado.id,
+            rutina_id: rutina.id,
+            fecha_rutina: hoyTexto,
+            titulo: rutina.titulo,
+            tipo: rutina.tipo,
+            descripcion: rutina.descripcion || null,
+            fecha_programada: fechaHoraAISO(
+              hoyTexto,
+              rutina.hora || '09:00'
+            ),
+            estado: 'pendiente',
+            producto_id: rutina.producto_id || null,
+            regla_dosificacion_id:
+              rutina.regla_dosificacion_id || null,
+            aplicar_sobre: rutina.aplicar_sobre || null,
+            volumen_litros: rutina.litros ?? null,
+          },
+        ])
+    }
   }
 
   const formatearFecha = (fecha) => {
@@ -1593,6 +1760,9 @@ function App() {
     setCargandoTareas(true)
 
     const hoyTexto = fechaHoy()
+
+    await materializarRutinasHoy()
+
     const mananaTexto =
       sumarDiasFecha(hoyTexto, 1)
 
@@ -1680,7 +1850,9 @@ function App() {
 
   const accionTarea = async (tarea) => {
     if (
-      tarea.tipo === 'producto' &&
+      ['producto', 'medicacion'].includes(
+        tarea.tipo
+      ) &&
       tarea.producto_id
     ) {
       const producto = productos.find(
@@ -2981,6 +3153,9 @@ function App() {
       cambio_agua: '🔄',
       alimentacion: '🍽️',
       mantenimiento: '🧽',
+      medicacion: '💊',
+      ciclado: '🔄',
+      limpieza: '🧹',
       nota: '📝',
       otro: '📌',
     }
@@ -3376,6 +3551,15 @@ function App() {
               </p>
             </div>
 
+            <button
+              className="boton-programar-hoy"
+              onClick={() =>
+                setSeccionActiva('calendario')
+              }
+            >
+              + Programar
+            </button>
+
             {tareasHoy.length > 0 && (
               <span>
                 {tareasHoy.filter(
@@ -3614,6 +3798,7 @@ function App() {
           onAcuarioActualizado={actualizarAcuarioLocal}
           modoOscuro={modoOscuro}
           onCambiarModo={cambiarModoOscuro}
+          onTareasCambiadas={cargarTareas}
         />
       )
     }
@@ -5424,6 +5609,16 @@ function App() {
                 <button
                   onClick={() => {
                     setMostrarRegistroRapido(false)
+                    setSeccionActiva('calendario')
+                  }}
+                >
+                  <span>📅</span>
+                  <strong>Programar actividad</strong>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setMostrarRegistroRapido(false)
                     abrirPlanCiclado()
                   }}
                   disabled={!cicladoActivo}
@@ -5906,11 +6101,47 @@ function App() {
                   className="tarjeta-acuario"
                   key={acuario.id}
                 >
-                  {acuario.foto_portada_url && (
-                    <div className="tarjeta-acuario-portada">
-                      <img src={acuario.foto_portada_url} alt={`Portada de ${acuario.nombre}`} loading="lazy" />
-                    </div>
-                  )}
+                  <div
+                    className={`tarjeta-acuario-portada ${
+                      !acuario.foto_portada_url
+                        ? `portada-default ${portadaDefaultAcuario(acuario.tipo).clase}`
+                        : ''
+                    }`}
+                  >
+                    {acuario.foto_portada_url ? (
+                      <img
+                        src={acuario.foto_portada_url}
+                        alt={`Portada de ${acuario.nombre}`}
+                        loading="lazy"
+                      />
+                    ) : (
+                      <div className="portada-default-contenido">
+                        <span>
+                          {
+                            portadaDefaultAcuario(
+                              acuario.tipo
+                            ).emoji
+                          }
+                        </span>
+
+                        <strong>
+                          {
+                            portadaDefaultAcuario(
+                              acuario.tipo
+                            ).titulo
+                          }
+                        </strong>
+
+                        <small>
+                          {
+                            portadaDefaultAcuario(
+                              acuario.tipo
+                            ).subtitulo
+                          }
+                        </small>
+                      </div>
+                    )}
+                  </div>
 
                   <div className="tarjeta-acuario-cabecera">
                     <div className="icono-acuario">

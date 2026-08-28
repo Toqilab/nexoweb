@@ -28,6 +28,9 @@ const iconoTipo = (tipo) => ({
   medicion_agua: '💧',
   cambio_agua: '🔄',
   mantenimiento: '🧽',
+  medicacion: '💊',
+  ciclado: '🔄',
+  limpieza: '🧹',
   alimentacion: '🍽️',
   nota: '📝',
   otro: '📌',
@@ -38,6 +41,22 @@ const sumarDias = (texto, dias) => {
   const fecha = new Date(y, m - 1, d)
   fecha.setDate(fecha.getDate() + dias)
   return fechaLocal(fecha)
+}
+
+const fechaDesdeTimestampLocal = (valor) => {
+  if (!valor) return ''
+
+  const fecha = new Date(valor)
+
+  if (Number.isNaN(fecha.getTime())) {
+    return String(valor).split('T')[0]
+  }
+
+  return fechaLocal(fecha)
+}
+
+const fechaHoraAISO = (fecha, hora = '09:00') => {
+  return new Date(`${fecha}T${hora}:00`).toISOString()
 }
 
 const diferenciaDias = (inicio, fin) => {
@@ -627,127 +646,1111 @@ function Rutinas({ acuario, onMensaje }) {
   )
 }
 
-function Calendario({ acuario, onMensaje }) {
+function Calendario({
+  acuario,
+  onMensaje,
+  onTareasCambiadas,
+}) {
   const [mes, setMes] = useState(() => {
     const f = new Date()
     return new Date(f.getFullYear(), f.getMonth(), 1)
   })
+
   const [rutinas, setRutinas] = useState([])
   const [tareas, setTareas] = useState([])
   const [ejecuciones, setEjecuciones] = useState([])
+  const [productos, setProductos] = useState([])
 
-  const inicioMes = fechaLocal(new Date(mes.getFullYear(), mes.getMonth(), 1))
-  const finMes = fechaLocal(new Date(mes.getFullYear(), mes.getMonth() + 1, 0))
-  const inicioGrilla = new Date(mes.getFullYear(), mes.getMonth(), 1 - new Date(mes.getFullYear(), mes.getMonth(), 1).getDay())
-  const finGrilla = new Date(mes.getFullYear(), mes.getMonth() + 1, 6 + (6 - new Date(mes.getFullYear(), mes.getMonth() + 1, 0).getDay()))
+  const [mostrarActividad, setMostrarActividad] =
+    useState(false)
+
+  const [guardandoActividad, setGuardandoActividad] =
+    useState(false)
+
+  const [form, setForm] = useState({
+    titulo: '',
+    tipo: 'cambio_agua',
+    fecha: fechaLocal(),
+    hora: '09:00',
+    repeticion: 'una_vez',
+    intervalo: '1',
+    dias_semana: [],
+    dia_mes: '1',
+    fecha_fin: '',
+    descripcion: '',
+    porcentaje_cambio_agua: '',
+    volumen_litros: '',
+    producto_id: '',
+    regla_dosificacion_id: '',
+    aplicar_sobre: 'volumen_total',
+  })
+
+  const primerDia = new Date(
+    mes.getFullYear(),
+    mes.getMonth(),
+    1
+  )
+
+  const ultimoDia = new Date(
+    mes.getFullYear(),
+    mes.getMonth() + 1,
+    0
+  )
+
+  const inicioGrilla = new Date(
+    mes.getFullYear(),
+    mes.getMonth(),
+    1 - primerDia.getDay()
+  )
+
+  const finGrilla = new Date(
+    mes.getFullYear(),
+    mes.getMonth() + 1,
+    6 + (6 - ultimoDia.getDay())
+  )
+
   const desde = fechaLocal(inicioGrilla)
   const hasta = fechaLocal(finGrilla)
 
   const cargar = async () => {
-    const inicioISO = new Date(`${desde}T00:00:00`).toISOString()
-    const finISO = new Date(`${sumarDias(hasta,1)}T00:00:00`).toISOString()
+    const inicioISO = fechaHoraAISO(desde, '00:00')
+    const finISO = fechaHoraAISO(
+      sumarDias(hasta, 1),
+      '00:00'
+    )
 
-    const [r, t, e] = await Promise.all([
-      supabase.from('rutinas_acuario').select('*').eq('acuario_id', acuario.id).eq('activa', true),
-      supabase.from('tareas_acuario').select('*').eq('acuario_id', acuario.id).gte('fecha_programada', inicioISO).lt('fecha_programada', finISO),
-      supabase.from('rutina_ejecuciones').select('*').eq('acuario_id', acuario.id).gte('fecha_programada', desde).lte('fecha_programada', hasta),
+    const [r, t, e, p] = await Promise.all([
+      supabase
+        .from('rutinas_acuario')
+        .select('*')
+        .eq('acuario_id', acuario.id)
+        .eq('activa', true),
+
+      supabase
+        .from('tareas_acuario')
+        .select('*')
+        .eq('acuario_id', acuario.id)
+        .gte('fecha_programada', inicioISO)
+        .lt('fecha_programada', finISO)
+        .order('fecha_programada'),
+
+      supabase
+        .from('rutina_ejecuciones')
+        .select('*')
+        .eq('acuario_id', acuario.id)
+        .gte('fecha_programada', desde)
+        .lte('fecha_programada', hasta),
+
+      supabase
+        .from('productos')
+        .select(`
+          *,
+          reglas_dosificacion (*)
+        `)
+        .order('nombre'),
     ])
+
     setRutinas(r.data ?? [])
     setTareas(t.data ?? [])
     setEjecuciones(e.data ?? [])
+    setProductos(p.data ?? [])
   }
 
-  useEffect(() => { cargar() }, [acuario.id, mes.getMonth(), mes.getFullYear()])
+  useEffect(() => {
+    cargar()
+  }, [
+    acuario.id,
+    mes.getMonth(),
+    mes.getFullYear(),
+  ])
 
   const eventosRutina = useMemo(
-    () => rutinas.flatMap(r => ocurrenciasRutina(r, desde, hasta)),
+    () =>
+      rutinas.flatMap((rutina) =>
+        ocurrenciasRutina(rutina, desde, hasta)
+      ),
     [rutinas, desde, hasta]
   )
 
   const eventos = useMemo(() => {
-    const rutinaEvents = eventosRutina.map(e => ({
-      ...e,
-      origen: 'rutina',
-      completada: ejecuciones.some(x => x.rutina_id === e.rutina_id && x.fecha_programada === e.fecha),
-    }))
+    const rutinaEvents = eventosRutina.map((evento) => {
+      const tareaRelacionada = tareas.find(
+        (tarea) =>
+          tarea.rutina_id === evento.rutina_id &&
+          tarea.fecha_rutina === evento.fecha
+      )
 
-    const taskEvents = tareas.map(t => ({
-      id: t.id,
-      origen: 'tarea',
-      fecha: t.fecha_programada?.split('T')[0],
-      titulo: t.titulo,
-      tipo: t.tipo,
-      completada: t.estado === 'completada',
-      tarea: t,
-    }))
+      const completada =
+        ejecuciones.some(
+          (item) =>
+            item.rutina_id === evento.rutina_id &&
+            item.fecha_programada === evento.fecha
+        ) ||
+        tareaRelacionada?.estado === 'completada'
+
+      return {
+        ...evento,
+        origen: 'rutina',
+        completada,
+        tarea: tareaRelacionada || null,
+      }
+    })
+
+    const taskEvents = tareas
+      .filter((tarea) => !tarea.rutina_id)
+      .map((tarea) => ({
+        id: tarea.id,
+        origen: 'tarea',
+        fecha: fechaDesdeTimestampLocal(
+          tarea.fecha_programada
+        ),
+        titulo: tarea.titulo,
+        tipo: tarea.tipo,
+        completada: tarea.estado === 'completada',
+        tarea,
+      }))
+
     return [...rutinaEvents, ...taskEvents]
   }, [eventosRutina, tareas, ejecuciones])
 
-  const completarRutina = async (evento) => {
-    const { error } = await supabase.from('rutina_ejecuciones').upsert([{
-      rutina_id: evento.rutina_id,
-      acuario_id: acuario.id,
-      fecha_programada: evento.fecha,
-      completada_en: new Date().toISOString(),
-    }], { onConflict: 'rutina_id,fecha_programada' })
+  const abrirActividad = (fecha = fechaLocal()) => {
+    const [anio, mesFecha, diaFecha] =
+      fecha.split('-').map(Number)
 
-    if (error) onMensaje(`Error: ${error.message}`)
-    else {
+    const fechaObj = new Date(
+      anio,
+      mesFecha - 1,
+      diaFecha
+    )
+
+    setForm({
+      titulo: '',
+      tipo: 'cambio_agua',
+      fecha,
+      hora: '09:00',
+      repeticion: 'una_vez',
+      intervalo: '1',
+      dias_semana: [fechaObj.getDay()],
+      dia_mes: String(fechaObj.getDate()),
+      fecha_fin: '',
+      descripcion: '',
+      porcentaje_cambio_agua: '',
+      volumen_litros: '',
+      producto_id: '',
+      regla_dosificacion_id: '',
+      aplicar_sobre: 'volumen_total',
+    })
+
+    setMostrarActividad(true)
+  }
+
+  const abrirActividadRapida = (tipo, titulo) => {
+    abrirActividad(fechaLocal())
+
+    setTimeout(() => {
+      setForm((anterior) => ({
+        ...anterior,
+        tipo,
+        titulo,
+      }))
+    }, 0)
+  }
+
+  const productoSeleccionado = productos.find(
+    (producto) => producto.id === form.producto_id
+  )
+
+  const reglas =
+    productoSeleccionado?.reglas_dosificacion ?? []
+
+  const reglaSeleccionada = reglas.find(
+    (regla) =>
+      regla.id === form.regla_dosificacion_id
+  )
+
+  useEffect(() => {
+    if (!form.producto_id) {
+      setForm((anterior) => ({
+        ...anterior,
+        regla_dosificacion_id: '',
+      }))
+      return
+    }
+
+    const primera =
+      reglas.find((regla) => regla.activa) ||
+      reglas[0]
+
+    if (primera?.id) {
+      setForm((anterior) => ({
+        ...anterior,
+        regla_dosificacion_id: primera.id,
+      }))
+    }
+  }, [form.producto_id])
+
+  const dosisCalculada = useMemo(() => {
+    if (!reglaSeleccionada) return null
+
+    let litros = Number(form.volumen_litros)
+
+    if (
+      !litros &&
+      form.aplicar_sobre === 'volumen_total'
+    ) {
+      litros = Number(acuario.volumen_litros)
+    }
+
+    if (
+      !litros ||
+      !reglaSeleccionada.volumen_referencia_litros
+    ) {
+      return null
+    }
+
+    return (
+      Number(reglaSeleccionada.dosis_cantidad) /
+      Number(
+        reglaSeleccionada.volumen_referencia_litros
+      ) *
+      litros
+    )
+  }, [
+    reglaSeleccionada,
+    form.volumen_litros,
+    form.aplicar_sobre,
+    acuario.volumen_litros,
+  ])
+
+  const cambiarDia = (dia) => {
+    setForm((anterior) => ({
+      ...anterior,
+      dias_semana: anterior.dias_semana.includes(dia)
+        ? anterior.dias_semana.filter(
+            (item) => item !== dia
+          )
+        : [...anterior.dias_semana, dia],
+    }))
+  }
+
+  const guardarActividad = async (e) => {
+    e.preventDefault()
+
+    if (!form.titulo.trim()) {
+      onMensaje('Ingresa un nombre para la actividad.')
+      return
+    }
+
+    setGuardandoActividad(true)
+
+    try {
+      const descripcionPartes = []
+
+      if (form.descripcion.trim()) {
+        descripcionPartes.push(
+          form.descripcion.trim()
+        )
+      }
+
+      if (
+        form.tipo === 'cambio_agua' &&
+        form.porcentaje_cambio_agua
+      ) {
+        descripcionPartes.push(
+          `Cambio de agua: ${form.porcentaje_cambio_agua}%`
+        )
+      }
+
+      if (
+        form.tipo === 'cambio_agua' &&
+        form.volumen_litros
+      ) {
+        descripcionPartes.push(
+          `Litros: ${form.volumen_litros} L`
+        )
+      }
+
+      if (form.tipo === 'medicacion') {
+        descripcionPartes.push(
+          'Tratamiento / medicación'
+        )
+      }
+
+      if (form.tipo === 'ciclado') {
+        descripcionPartes.push(
+          'Seguimiento de ciclado'
+        )
+      }
+
+      const descripcion =
+        descripcionPartes.filter(Boolean).join(' · ') ||
+        null
+
+      const esProducto = [
+        'producto',
+        'medicacion',
+      ].includes(form.tipo)
+
+      if (form.repeticion === 'una_vez') {
+        const { error } = await supabase
+          .from('tareas_acuario')
+          .insert([
+            {
+              acuario_id: acuario.id,
+              titulo: form.titulo.trim(),
+              tipo: form.tipo,
+              descripcion,
+              fecha_programada: fechaHoraAISO(
+                form.fecha,
+                form.hora || '09:00'
+              ),
+              estado: 'pendiente',
+              producto_id: esProducto
+                ? form.producto_id || null
+                : null,
+              regla_dosificacion_id: esProducto
+                ? form.regla_dosificacion_id || null
+                : null,
+              aplicar_sobre: esProducto
+                ? form.aplicar_sobre || null
+                : null,
+              volumen_litros: numeroONull(
+                form.volumen_litros
+              ),
+              dosis_calculada:
+                dosisCalculada != null
+                  ? Number(dosisCalculada.toFixed(3))
+                  : null,
+              unidad:
+                reglaSeleccionada?.dosis_unidad || null,
+            },
+          ])
+
+        if (error) throw error
+      } else {
+        const frecuencia =
+          form.repeticion === 'cada_x_dias'
+            ? 'cada_x_dias'
+            : form.repeticion
+
+        const { data: rutina, error } = await supabase
+          .from('rutinas_acuario')
+          .insert([
+            {
+              acuario_id: acuario.id,
+              titulo: form.titulo.trim(),
+              tipo: form.tipo,
+              descripcion,
+              frecuencia,
+              intervalo: Number(form.intervalo) || 1,
+              dias_semana:
+                frecuencia === 'semanal'
+                  ? form.dias_semana
+                  : null,
+              dia_mes:
+                frecuencia === 'mensual'
+                  ? Number(form.dia_mes)
+                  : null,
+              hora: form.hora || null,
+              fecha_inicio: form.fecha,
+              fecha_fin: form.fecha_fin || null,
+              producto_id: esProducto
+                ? form.producto_id || null
+                : null,
+              regla_dosificacion_id: esProducto
+                ? form.regla_dosificacion_id || null
+                : null,
+              aplicar_sobre: esProducto
+                ? form.aplicar_sobre || null
+                : null,
+              litros: numeroONull(form.volumen_litros),
+              activa: true,
+            },
+          ])
+          .select()
+          .single()
+
+        if (error) throw error
+
+        if (
+          rutina &&
+          form.fecha === fechaLocal()
+        ) {
+          await supabase
+            .from('tareas_acuario')
+            .insert([
+              {
+                acuario_id: acuario.id,
+                rutina_id: rutina.id,
+                fecha_rutina: form.fecha,
+                titulo: form.titulo.trim(),
+                tipo: form.tipo,
+                descripcion,
+                fecha_programada: fechaHoraAISO(
+                  form.fecha,
+                  form.hora || '09:00'
+                ),
+                estado: 'pendiente',
+                producto_id: esProducto
+                  ? form.producto_id || null
+                  : null,
+                regla_dosificacion_id: esProducto
+                  ? form.regla_dosificacion_id || null
+                  : null,
+                aplicar_sobre: esProducto
+                  ? form.aplicar_sobre || null
+                  : null,
+                volumen_litros: numeroONull(
+                  form.volumen_litros
+                ),
+                dosis_calculada:
+                  dosisCalculada != null
+                    ? Number(
+                        dosisCalculada.toFixed(3)
+                      )
+                    : null,
+                unidad:
+                  reglaSeleccionada?.dosis_unidad ||
+                  null,
+              },
+            ])
+        }
+      }
+
+      setMostrarActividad(false)
+
       await cargar()
-      onMensaje('✅ Rutina marcada como realizada.')
+      await onTareasCambiadas?.()
+
+      onMensaje(
+        form.repeticion === 'una_vez'
+          ? '✅ Actividad programada.'
+          : '✅ Rutina programada.'
+      )
+    } catch (error) {
+      onMensaje(`Error: ${error.message}`)
+    } finally {
+      setGuardandoActividad(false)
     }
   }
 
   const dias = []
   let cursor = new Date(inicioGrilla)
+
   while (cursor <= finGrilla) {
     dias.push(new Date(cursor))
     cursor.setDate(cursor.getDate() + 1)
   }
 
-  const nombreMes = mes.toLocaleDateString('es-EC', { month: 'long', year: 'numeric' })
+  const nombreMes = mes.toLocaleDateString(
+    'es-EC',
+    {
+      month: 'long',
+      year: 'numeric',
+    }
+  )
 
   return (
     <div>
-      <Encabezado titulo="Calendario" descripcion="Rutinas, tareas del ciclado y actividades programadas." />
+      <Encabezado
+        titulo="Calendario"
+        descripcion="Programa manualmente lo que quieras hacer en este acuario."
+        accion="+ Actividad"
+        onAccion={() => abrirActividad()}
+      />
+
+      <div className="calendario-acciones-rapidas">
+        <button
+          onClick={() =>
+            abrirActividadRapida(
+              'cambio_agua',
+              'Cambio de agua'
+            )
+          }
+        >
+          <span>🔄</span>
+          Cambio de agua
+        </button>
+
+        <button
+          onClick={() =>
+            abrirActividadRapida(
+              'mantenimiento',
+              'Mantenimiento'
+            )
+          }
+        >
+          <span>🧽</span>
+          Mantenimiento
+        </button>
+
+        <button
+          onClick={() =>
+            abrirActividadRapida(
+              'medicacion',
+              'Medicación'
+            )
+          }
+        >
+          <span>💊</span>
+          Medicación
+        </button>
+
+        <button
+          onClick={() =>
+            abrirActividadRapida(
+              'ciclado',
+              'Revisión de ciclado'
+            )
+          }
+        >
+          <span>🔄</span>
+          Ciclado
+        </button>
+      </div>
+
       <div className="calendario-toolbar">
-        <button className="boton-claro" onClick={() => setMes(new Date(mes.getFullYear(), mes.getMonth()-1, 1))}>←</button>
+        <button
+          className="boton-claro"
+          onClick={() =>
+            setMes(
+              new Date(
+                mes.getFullYear(),
+                mes.getMonth() - 1,
+                1
+              )
+            )
+          }
+        >
+          ←
+        </button>
+
         <strong>{nombreMes}</strong>
-        <button className="boton-claro" onClick={() => setMes(new Date(mes.getFullYear(), mes.getMonth()+1, 1))}>→</button>
+
+        <button
+          className="boton-claro"
+          onClick={() =>
+            setMes(
+              new Date(
+                mes.getFullYear(),
+                mes.getMonth() + 1,
+                1
+              )
+            )
+          }
+        >
+          →
+        </button>
       </div>
 
       <div className="calendario-dias-cabecera">
-        {['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'].map(d => <span key={d}>{d}</span>)}
+        {[
+          'Dom',
+          'Lun',
+          'Mar',
+          'Mié',
+          'Jue',
+          'Vie',
+          'Sáb',
+        ].map((dia) => (
+          <span key={dia}>{dia}</span>
+        ))}
       </div>
 
       <div className="calendario-grid">
-        {dias.map(dia => {
+        {dias.map((dia) => {
           const texto = fechaLocal(dia)
-          const delMes = dia.getMonth() === mes.getMonth()
-          const delDia = eventos.filter(e => e.fecha === texto)
+          const delMes =
+            dia.getMonth() === mes.getMonth()
+
+          const delDia = eventos.filter(
+            (evento) => evento.fecha === texto
+          )
+
           return (
-            <div className={`calendario-dia ${delMes ? '' : 'fuera'} ${texto === fechaLocal() ? 'hoy' : ''}`} key={texto}>
+            <button
+              type="button"
+              className={`calendario-dia calendario-dia-clickable ${
+                delMes ? '' : 'fuera'
+              } ${
+                texto === fechaLocal() ? 'hoy' : ''
+              }`}
+              key={texto}
+              onClick={() => abrirActividad(texto)}
+            >
               <strong>{dia.getDate()}</strong>
+
               <div className="eventos-dia">
-                {delDia.slice(0,4).map(e => (
-                  <button
-                    key={`${e.origen}-${e.id}`}
-                    className={`evento-calendario ${e.completada ? 'completada' : ''}`}
-                    title={e.titulo}
-                    onClick={() => e.origen === 'rutina' && !e.completada ? completarRutina(e) : null}
+                {delDia.slice(0, 4).map((evento) => (
+                  <span
+                    key={`${evento.origen}-${evento.id}`}
+                    className={`evento-calendario ${
+                      evento.completada
+                        ? 'completada'
+                        : ''
+                    }`}
+                    title={evento.titulo}
+                    onClick={(e) => e.stopPropagation()}
                   >
-                    {iconoTipo(e.tipo)} {e.titulo}
-                  </button>
+                    {iconoTipo(evento.tipo)}{' '}
+                    {evento.titulo}
+                  </span>
                 ))}
-                {delDia.length > 4 && <small>+{delDia.length-4} más</small>}
+
+                {delDia.length > 4 && (
+                  <small>
+                    +{delDia.length - 4} más
+                  </small>
+                )}
               </div>
-            </div>
+            </button>
           )
         })}
       </div>
+
+      <div className="calendario-ayuda">
+        <span>💡</span>
+        <div>
+          <strong>Toca cualquier día</strong>
+          <small>
+            Puedes crear una actividad única o una rutina diaria,
+            semanal, mensual o cada X días.
+          </small>
+        </div>
+      </div>
+
+      {mostrarActividad && (
+        <Modal
+          titulo="Programar actividad"
+          subtitulo="Tú decides qué hacer, cuándo hacerlo y si se repite."
+          onCerrar={() => setMostrarActividad(false)}
+        >
+          <form onSubmit={guardarActividad}>
+            <div className="campo-formulario">
+              <label>Actividad</label>
+
+              <select
+                value={form.tipo}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    tipo: e.target.value,
+                  })
+                }
+              >
+                <option value="cambio_agua">
+                  🔄 Cambio de agua
+                </option>
+                <option value="mantenimiento">
+                  🧽 Mantenimiento
+                </option>
+                <option value="limpieza">
+                  🧹 Limpieza
+                </option>
+                <option value="medicion_agua">
+                  💧 Medición de agua
+                </option>
+                <option value="producto">
+                  🧪 Producto / fertilizante
+                </option>
+                <option value="medicacion">
+                  💊 Medicación / tratamiento
+                </option>
+                <option value="alimentacion">
+                  🍽️ Alimentación
+                </option>
+                <option value="ciclado">
+                  🔄 Ciclado / revisión
+                </option>
+                <option value="nota">
+                  📝 Recordatorio
+                </option>
+                <option value="otro">
+                  📌 Otro
+                </option>
+              </select>
+            </div>
+
+            <div className="campo-formulario">
+              <label>Nombre</label>
+              <input
+                value={form.titulo}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    titulo: e.target.value,
+                  })
+                }
+                placeholder="Ej. Cambio de agua 20%"
+                required
+              />
+            </div>
+
+            <div className="fila-formulario">
+              <div className="campo-formulario">
+                <label>Fecha</label>
+                <input
+                  type="date"
+                  value={form.fecha}
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      fecha: e.target.value,
+                    })
+                  }
+                  required
+                />
+              </div>
+
+              <div className="campo-formulario">
+                <label>Hora</label>
+                <input
+                  type="time"
+                  value={form.hora}
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      hora: e.target.value,
+                    })
+                  }
+                />
+              </div>
+            </div>
+
+            {form.tipo === 'cambio_agua' && (
+              <div className="fila-formulario">
+                <div className="campo-formulario">
+                  <label>Porcentaje %</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.1"
+                    value={form.porcentaje_cambio_agua}
+                    onChange={(e) => {
+                      const valor = e.target.value
+                      const porcentaje = Number(valor)
+
+                      const litros =
+                        acuario.volumen_litros &&
+                        porcentaje
+                          ? (
+                              Number(acuario.volumen_litros) *
+                              porcentaje /
+                              100
+                            ).toFixed(1)
+                          : ''
+
+                      setForm({
+                        ...form,
+                        porcentaje_cambio_agua: valor,
+                        volumen_litros: litros,
+                      })
+                    }}
+                  />
+                </div>
+
+                <div className="campo-formulario">
+                  <label>Litros</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.1"
+                    value={form.volumen_litros}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        volumen_litros: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+              </div>
+            )}
+
+            {[
+              'producto',
+              'medicacion',
+            ].includes(form.tipo) && (
+              <>
+                <div className="campo-formulario">
+                  <label>Producto</label>
+
+                  <select
+                    value={form.producto_id}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        producto_id: e.target.value,
+                      })
+                    }
+                  >
+                    <option value="">
+                      Sin producto asociado
+                    </option>
+
+                    {productos.map((producto) => (
+                      <option
+                        key={producto.id}
+                        value={producto.id}
+                      >
+                        {producto.nombre}
+                        {producto.marca
+                          ? ` · ${producto.marca}`
+                          : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {reglas.length > 0 && (
+                  <div className="campo-formulario">
+                    <label>Regla de dosis</label>
+
+                    <select
+                      value={form.regla_dosificacion_id}
+                      onChange={(e) =>
+                        setForm({
+                          ...form,
+                          regla_dosificacion_id:
+                            e.target.value,
+                        })
+                      }
+                    >
+                      {reglas.map((regla) => (
+                        <option
+                          key={regla.id}
+                          value={regla.id}
+                        >
+                          {regla.nombre} ·{' '}
+                          {regla.dosis_cantidad}{' '}
+                          {regla.dosis_unidad} /{' '}
+                          {regla.volumen_referencia_litros} L
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                <div className="fila-formulario">
+                  <div className="campo-formulario">
+                    <label>Aplicar sobre</label>
+
+                    <select
+                      value={form.aplicar_sobre}
+                      onChange={(e) =>
+                        setForm({
+                          ...form,
+                          aplicar_sobre: e.target.value,
+                        })
+                      }
+                    >
+                      <option value="volumen_total">
+                        Volumen total
+                      </option>
+                      <option value="agua_nueva">
+                        Agua nueva
+                      </option>
+                      <option value="personalizado">
+                        Litros personalizados
+                      </option>
+                    </select>
+                  </div>
+
+                  <div className="campo-formulario">
+                    <label>Litros</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={form.volumen_litros}
+                      onChange={(e) =>
+                        setForm({
+                          ...form,
+                          volumen_litros: e.target.value,
+                        })
+                      }
+                      placeholder={
+                        form.aplicar_sobre ===
+                        'volumen_total'
+                          ? `${acuario.volumen_litros || ''}`
+                          : ''
+                      }
+                    />
+                  </div>
+                </div>
+
+                {dosisCalculada != null && (
+                  <div className="actividad-dosis-preview">
+                    <span>Dosis aproximada</span>
+                    <strong>
+                      {dosisCalculada.toFixed(2)}{' '}
+                      {reglaSeleccionada?.dosis_unidad}
+                    </strong>
+                  </div>
+                )}
+              </>
+            )}
+
+            <div className="campo-formulario">
+              <label>Repetición</label>
+
+              <select
+                value={form.repeticion}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    repeticion: e.target.value,
+                  })
+                }
+              >
+                <option value="una_vez">
+                  Solo esta vez
+                </option>
+                <option value="diaria">
+                  Todos los días
+                </option>
+                <option value="semanal">
+                  Semanal
+                </option>
+                <option value="cada_x_dias">
+                  Cada X días
+                </option>
+                <option value="mensual">
+                  Mensual
+                </option>
+              </select>
+            </div>
+
+            {[
+              'diaria',
+              'cada_x_dias',
+            ].includes(form.repeticion) && (
+              <div className="campo-formulario">
+                <label>Cada cuántos días</label>
+                <input
+                  type="number"
+                  min="1"
+                  value={form.intervalo}
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      intervalo: e.target.value,
+                    })
+                  }
+                />
+              </div>
+            )}
+
+            {form.repeticion === 'semanal' && (
+              <div className="campo-formulario">
+                <label>Días de la semana</label>
+
+                <div className="selector-dias">
+                  {[
+                    'D',
+                    'L',
+                    'M',
+                    'X',
+                    'J',
+                    'V',
+                    'S',
+                  ].map((nombre, dia) => (
+                    <button
+                      type="button"
+                      key={dia}
+                      className={
+                        form.dias_semana.includes(dia)
+                          ? 'activo'
+                          : ''
+                      }
+                      onClick={() => cambiarDia(dia)}
+                    >
+                      {nombre}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {form.repeticion === 'mensual' && (
+              <div className="campo-formulario">
+                <label>Día del mes</label>
+                <input
+                  type="number"
+                  min="1"
+                  max="31"
+                  value={form.dia_mes}
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      dia_mes: e.target.value,
+                    })
+                  }
+                />
+              </div>
+            )}
+
+            {form.repeticion !== 'una_vez' && (
+              <div className="campo-formulario">
+                <label>Fecha fin (opcional)</label>
+                <input
+                  type="date"
+                  value={form.fecha_fin}
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      fecha_fin: e.target.value,
+                    })
+                  }
+                />
+              </div>
+            )}
+
+            <div className="campo-formulario">
+              <label>Notas</label>
+              <textarea
+                rows="3"
+                value={form.descripcion}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    descripcion: e.target.value,
+                  })
+                }
+                placeholder="Opcional"
+              />
+            </div>
+
+            <div className="acciones-modal">
+              <button
+                type="button"
+                className="boton-cancelar"
+                onClick={() =>
+                  setMostrarActividad(false)
+                }
+                disabled={guardandoActividad}
+              >
+                Cancelar
+              </button>
+
+              <button
+                className="boton-principal"
+                disabled={guardandoActividad}
+              >
+                {guardandoActividad
+                  ? 'Guardando...'
+                  : form.repeticion === 'una_vez'
+                  ? 'Programar'
+                  : 'Crear rutina'}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
     </div>
   )
 }
+
 
 function Inventario({ acuario, onMensaje }) {
   const [items, setItems] = useState([])
@@ -1154,13 +2157,14 @@ export default function GestionAvanzada({
   onAcuarioActualizado,
   modoOscuro,
   onCambiarModo,
+  onTareasCambiadas,
 }) {
   if (!acuario) return null
 
   if (seccion === 'configuracion') return <ConfiguracionAcuario acuario={acuario} session={session} onMensaje={onMensaje} onAcuarioActualizado={onAcuarioActualizado} modoOscuro={modoOscuro} onCambiarModo={onCambiarModo} />
   if (seccion === 'salud') return <Salud acuario={acuario} onMensaje={onMensaje} />
   if (seccion === 'rutinas') return <Rutinas acuario={acuario} onMensaje={onMensaje} />
-  if (seccion === 'calendario') return <Calendario acuario={acuario} onMensaje={onMensaje} />
+  if (seccion === 'calendario') return <Calendario acuario={acuario} onMensaje={onMensaje} onTareasCambiadas={onTareasCambiadas} />
   if (seccion === 'inventario') return <Inventario acuario={acuario} onMensaje={onMensaje} />
   if (seccion === 'costos') return <Costos acuario={acuario} onMensaje={onMensaje} />
   if (seccion === 'comparar') return <Comparar session={session} onMensaje={onMensaje} />
