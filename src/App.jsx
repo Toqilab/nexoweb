@@ -5,7 +5,7 @@ import ModulosExtras from './ModulosExtras.jsx'
 import GestionAvanzada, { ResumenInteligente } from './GestionAvanzada.jsx'
 import { subirImagenPublica, formatoBytes } from './utilsImagenes.js'
 
-const NEXOWEB_VERSION = '1.1.0'
+const NEXOWEB_VERSION = '1.2.0'
 
 function App() {
   /* =========================================================
@@ -38,6 +38,13 @@ function App() {
   const [progresoCreacion, setProgresoCreacion] = useState('')
   const [menuTarjetaAcuario, setMenuTarjetaAcuario] = useState(null)
   const [eliminandoAcuarioId, setEliminandoAcuarioId] = useState(null)
+  const [acuarioEliminarPendiente, setAcuarioEliminarPendiente] = useState(null)
+  const [mostrarDetallesAcuario, setMostrarDetallesAcuario] = useState(false)
+  const [deferredInstallPrompt, setDeferredInstallPrompt] = useState(null)
+  const [appInstalada, setAppInstalada] = useState(
+    window.matchMedia?.('(display-mode: standalone)')?.matches ||
+    window.navigator.standalone === true
+  )
   const [fotoPortadaArchivo, setFotoPortadaArchivo] = useState(null)
   const [fotoPortadaPreview, setFotoPortadaPreview] = useState('')
   const [modoOscuro, setModoOscuro] = useState(() => localStorage.getItem('nexoweb-tema') === 'oscuro')
@@ -206,6 +213,58 @@ function App() {
   ========================================================= */
 
   const [mostrarRegistroRapido, setMostrarRegistroRapido] = useState(false)
+
+  /* =========================================================
+     INSTALACIÓN PWA
+  ========================================================= */
+
+  useEffect(() => {
+    const capturarPrompt = (event) => {
+      event.preventDefault()
+      setDeferredInstallPrompt(event)
+    }
+
+    const instalada = () => {
+      setDeferredInstallPrompt(null)
+      setAppInstalada(true)
+    }
+
+    window.addEventListener('beforeinstallprompt', capturarPrompt)
+    window.addEventListener('appinstalled', instalada)
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', capturarPrompt)
+      window.removeEventListener('appinstalled', instalada)
+    }
+  }, [])
+
+  const instalarNexoWeb = async () => {
+    if (appInstalada) {
+      setMensaje('✅ NexoWeb ya está instalada en este dispositivo.')
+      return
+    }
+
+    if (!deferredInstallPrompt) {
+      setMensaje(
+        'ℹ️ En iPhone/iPad usa Compartir → Agregar a pantalla de inicio. ' +
+        'En Android abre el menú del navegador y elige Instalar aplicación.'
+      )
+      return
+    }
+
+    try {
+      await deferredInstallPrompt.prompt()
+      const resultado = await deferredInstallPrompt.userChoice
+
+      if (resultado.outcome === 'accepted') {
+        setMensaje('✅ Instalación de NexoWeb iniciada.')
+      }
+
+      setDeferredInstallPrompt(null)
+    } catch (error) {
+      setMensaje(`❌ No se pudo iniciar la instalación: ${error.message}`)
+    }
+  }
 
   /* =========================================================
      APARIENCIA
@@ -505,6 +564,7 @@ function App() {
     setFotoPortadaPreview('')
     setMensajeAcuario('')
     setProgresoCreacion('')
+    setMostrarDetallesAcuario(false)
     guardandoAcuarioRef.current = false
     setMostrarModalAcuario(true)
   }
@@ -754,33 +814,20 @@ function App() {
     }
   }
 
-  const eliminarAcuarioDefinitivamente = async (acuario) => {
+  const solicitarEliminarAcuario = (acuario) => {
     if (!acuario?.id || eliminandoAcuarioId) return
-
     setMenuTarjetaAcuario(null)
+    setAcuarioEliminarPendiente(acuario)
+  }
 
-    const confirmacion = window.prompt(
-      `⚠️ ELIMINAR DEFINITIVAMENTE\n\n` +
-      `"${acuario.nombre}" y toda su información relacionada serán eliminados.\n\n` +
-      'Para continuar escribe exactamente:\nELIMINAR'
-    )
+  const cancelarEliminarAcuario = () => {
+    if (eliminandoAcuarioId) return
+    setAcuarioEliminarPendiente(null)
+  }
 
-    if (confirmacion !== 'ELIMINAR') {
-      if (confirmacion !== null) {
-        setMensaje(
-          'ℹ️ No se eliminó el acuario porque la confirmación no coincidió.'
-        )
-      }
-      return
-    }
-
-    const ultimaConfirmacion = window.confirm(
-      `Última confirmación:\n\n` +
-      `¿Eliminar definitivamente "${acuario.nombre}"?\n\n` +
-      'Esta acción no se puede deshacer.'
-    )
-
-    if (!ultimaConfirmacion) return
+  const eliminarAcuarioDefinitivamente = async () => {
+    const acuario = acuarioEliminarPendiente
+    if (!acuario?.id || eliminandoAcuarioId) return
 
     setEliminandoAcuarioId(acuario.id)
     setMensaje('')
@@ -800,14 +847,10 @@ function App() {
         lista.filter((item) => item.id !== acuario.id)
       )
 
-      setMensaje(
-        `✅ "${acuario.nombre}" fue eliminado definitivamente.`
-      )
+      setAcuarioEliminarPendiente(null)
+      setMensaje(`✅ "${acuario.nombre}" fue eliminado correctamente.`)
     } catch (error) {
-      console.error(error)
-      setMensaje(
-        `❌ No se pudo eliminar el acuario: ${error.message}`
-      )
+      setMensaje(`❌ No se pudo eliminar el acuario: ${error.message}`)
     } finally {
       setEliminandoAcuarioId(null)
     }
@@ -3412,132 +3455,48 @@ function App() {
   ========================================================= */
 
   const seccionesPrincipales = [
-    {
-      id: 'resumen',
-      nombre: 'Inicio',
-      icono: '🏠',
-    },
-    {
-      id: 'agua',
-      nombre: 'Agua',
-      icono: '💧',
-    },
-    {
-      id: 'productos',
-      nombre: 'Productos',
-      icono: '🧪',
-    },
-    {
-      id: 'habitantes',
-      nombre: 'Habitantes',
-      icono: '🐟',
-    },
-    {
-      id: 'plantas',
-      nombre: 'Plantas',
-      icono: '🌿',
-    },
-    {
-      id: 'mantenimiento',
-      nombre: 'Mantenimiento',
-      icono: '🧽',
-    },
-    {
-      id: 'alimentacion',
-      nombre: 'Alimentación',
-      icono: '🍽️',
-    },
-    {
-      id: 'calendario',
-      nombre: 'Calendario',
-      icono: '📅',
-    },
-    {
-      id: 'historial',
-      nombre: 'Historial',
-      icono: '🕘',
-    },
+    { id: 'resumen', nombre: 'Inicio', icono: '🏠' },
+    { id: 'agua', nombre: 'Agua', icono: '💧' },
+    { id: 'habitantes', nombre: 'Habitantes', icono: '🐟' },
+    { id: 'mantenimiento', nombre: 'Mantenimiento', icono: '🧽' },
+    { id: 'calendario', nombre: 'Calendario', icono: '📅' },
+    { id: 'historial', nombre: 'Historial', icono: '🕘' },
   ]
 
   const seccionesMas = [
     {
-      grupo: 'Gestión',
+      grupo: 'Vida del acuario',
       items: [
-        {
-          id: 'salud',
-          nombre: 'Salud',
-          icono: '🩺',
-        },
-        {
-          id: 'rutinas',
-          nombre: 'Rutinas',
-          icono: '🔁',
-        },
-        {
-          id: 'inventario',
-          nombre: 'Inventario',
-          icono: '📦',
-        },
-        {
-          id: 'equipos',
-          nombre: 'Equipos',
-          icono: '⚙️',
-        },
-        {
-          id: 'iluminacion',
-          nombre: 'Iluminación',
-          icono: '💡',
-        },
+        { id: 'plantas', nombre: 'Plantas', icono: '🌿' },
+        { id: 'salud', nombre: 'Salud', icono: '🩺' },
+        { id: 'alimentacion', nombre: 'Alimentación', icono: '🍽️' },
+        { id: 'notas', nombre: 'Notas', icono: '📝' },
+        { id: 'fotos', nombre: 'Fotos', icono: '📷' },
       ],
     },
     {
-      grupo: 'Registro',
+      grupo: 'Productos y automatización',
       items: [
-        {
-          id: 'notas',
-          nombre: 'Notas',
-          icono: '📝',
-        },
-        {
-          id: 'fotos',
-          nombre: 'Fotos',
-          icono: '📷',
-        },
-        {
-          id: 'costos',
-          nombre: 'Costos',
-          icono: '💵',
-        },
+        { id: 'productos', nombre: 'Productos', icono: '🧪' },
+        { id: 'rutinas', nombre: 'Rutinas', icono: '🔁' },
+        { id: 'inventario', nombre: 'Inventario', icono: '📦' },
+        { id: 'equipos', nombre: 'Equipos', icono: '⚙️' },
+        { id: 'iluminacion', nombre: 'Iluminación', icono: '💡' },
       ],
     },
     {
       grupo: 'Herramientas',
       items: [
-        {
-          id: 'comparar',
-          nombre: 'Comparar acuarios',
-          icono: '⚖️',
-        },
-        {
-          id: 'informes',
-          nombre: 'Informe / QR',
-          icono: '📄',
-        },
+        { id: 'costos', nombre: 'Costos', icono: '💵' },
+        { id: 'comparar', nombre: 'Comparar', icono: '⚖️' },
+        { id: 'informes', nombre: 'Informe / QR', icono: '📄' },
       ],
     },
     {
-      grupo: 'Administración',
+      grupo: 'Configuración',
       items: [
-        {
-          id: 'configuracion',
-          nombre: 'Configuración',
-          icono: '🛠️',
-        },
-        {
-          id: 'ajustes',
-          nombre: 'Datos / Respaldo',
-          icono: '💾',
-        },
+        { id: 'configuracion', nombre: 'Acuario', icono: '🛠️' },
+        { id: 'ajustes', nombre: 'Datos / Respaldo', icono: '💾' },
       ],
     },
   ]
@@ -4064,6 +4023,22 @@ function App() {
               </div>
 
               <div className="menu-mas-movil-lista">
+                {!appInstalada && (
+                  <button
+                    className="instalar-desde-mas"
+                    onClick={() => {
+                      setMostrarMenuMasMovil(false)
+                      instalarNexoWeb()
+                    }}
+                  >
+                    <span>⬇️</span>
+                    <div>
+                      <strong>Instalar NexoWeb</strong>
+                      <small>Agregar a la pantalla de inicio</small>
+                    </div>
+                  </button>
+                )}
+
                 {seccionesMas.map((grupo) => (
                   <section
                     className="menu-mas-movil-grupo"
@@ -5829,14 +5804,24 @@ function App() {
             </p>
           </div>
 
-          <button
-            className="boton-principal"
-            onClick={
-              abrirModalAcuario
-            }
-          >
-            + Crear acuario
-          </button>
+          <div className="acciones-mis-acuarios">
+            {!appInstalada && (
+              <button
+                className="boton-instalar-app"
+                onClick={instalarNexoWeb}
+              >
+                <span>⬇️</span>
+                Instalar NexoWeb
+              </button>
+            )}
+
+            <button
+              className="boton-principal"
+              onClick={abrirModalAcuario}
+            >
+              + Crear acuario
+            </button>
+          </div>
         </div>
 
         {mensaje && (
@@ -5928,7 +5913,7 @@ function App() {
                                 eliminandoAcuarioId === acuario.id
                               }
                               onClick={() =>
-                                eliminarAcuarioDefinitivamente(acuario)
+                                solicitarEliminarAcuario(acuario)
                               }
                             >
                               🗑️ Eliminar definitivamente
@@ -5989,6 +5974,55 @@ function App() {
           </div>
         )}
       </main>
+
+      {acuarioEliminarPendiente && (
+        <div
+          className="modal-overlay modal-confirmacion-overlay"
+          onClick={cancelarEliminarAcuario}
+        >
+          <div
+            className="modal-confirmacion"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="confirmacion-icono peligro">🗑️</div>
+            <h2>Eliminar acuario</h2>
+            <p>
+              ¿Seguro que quieres eliminar
+              <strong> {acuarioEliminarPendiente.nombre}</strong>?
+            </p>
+
+            <div className="confirmacion-aviso">
+              Se eliminarán sus mediciones, tareas, habitantes, fotos
+              y demás registros relacionados. Esta acción no se puede deshacer.
+            </div>
+
+            <div className="confirmacion-acciones">
+              <button
+                className="boton-cancelar"
+                disabled={Boolean(eliminandoAcuarioId)}
+                onClick={cancelarEliminarAcuario}
+              >
+                Cancelar
+              </button>
+
+              <button
+                className="boton-eliminar-confirmacion"
+                disabled={Boolean(eliminandoAcuarioId)}
+                onClick={eliminarAcuarioDefinitivamente}
+              >
+                {eliminandoAcuarioId ? (
+                  <>
+                    <span className="spinner-mini" />
+                    Eliminando...
+                  </>
+                ) : (
+                  'Eliminar'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {mostrarModalAcuario && (
         <div className="modal-overlay">
@@ -6241,6 +6275,26 @@ function App() {
                 </div>
               </div>
 
+              <button
+                type="button"
+                className="boton-detalles-opcionales"
+                onClick={() =>
+                  setMostrarDetallesAcuario((actual) => !actual)
+                }
+                disabled={guardandoAcuario}
+              >
+                <span>⚙️</span>
+                <div>
+                  <strong>Más detalles</strong>
+                  <small>
+                    Medidas, ubicación, temperatura y otros datos opcionales
+                  </small>
+                </div>
+                <span>{mostrarDetallesAcuario ? '⌃' : '⌄'}</span>
+              </button>
+
+              {mostrarDetallesAcuario && (
+                <div className="detalles-opcionales">
               <div className="fila-formulario">
                 <div className="campo-formulario">
                   <label>Subtipo</label>
@@ -6362,6 +6416,9 @@ function App() {
                   onChange={actualizarCampoAcuario}
                 />
               </div>
+
+                </div>
+              )}
 
               <div className="campo-formulario">
                 <label>

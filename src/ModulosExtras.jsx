@@ -590,117 +590,195 @@ function Fotos({ acuario, session, onMensaje }) {
   const [modal, setModal] = useState(false)
   const [guardando, setGuardando] = useState(false)
   const [archivo, setArchivo] = useState(null)
+  const [preview, setPreview] = useState('')
   const [descripcion, setDescripcion] = useState('')
   const [modoCalidad, setModoCalidad] = useState('miniatura')
 
   const cargar = async () => {
     setCargando(true)
-    const { data, error } = await supabase.from('fotos_acuario').select('*').eq('acuario_id', acuario.id).order('fecha', { ascending: false })
+    const { data, error } = await supabase
+      .from('fotos_acuario')
+      .select('*')
+      .eq('acuario_id', acuario.id)
+      .order('fecha', { ascending: false })
+
     if (error) onMensaje(`Error: ${error.message}`)
     else setItems(data ?? [])
+
     setCargando(false)
   }
 
-  useEffect(() => { cargar() }, [acuario.id])
+  useEffect(() => {
+    cargar()
+  }, [acuario.id])
 
-  const formatoBytes = (bytes) => {
-    if (!bytes) return '0 KB'
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`
-    return `${(bytes / (1024 * 1024)).toFixed(2)} MB`
+  const seleccionarArchivo = (nuevoArchivo) => {
+    if (!nuevoArchivo) return
+
+    if (!nuevoArchivo.type?.startsWith('image/')) {
+      onMensaje('Selecciona una imagen válida.')
+      return
+    }
+
+    if (preview?.startsWith('blob:')) {
+      URL.revokeObjectURL(preview)
+    }
+
+    setArchivo(nuevoArchivo)
+    setPreview(URL.createObjectURL(nuevoArchivo))
   }
 
-  const comprimirImagen = async (file, modo) => {
-    if (modo === 'original') return file
+  const abrirModal = () => {
+    setArchivo(null)
+    setPreview('')
+    setDescripcion('')
+    setModoCalidad('miniatura')
+    setModal(true)
+  }
 
-    const configuracion = modo === 'media'
-      ? { maximo: 1920, calidad: 0.78 }
-      : { maximo: 1280, calidad: 0.68 }
+  const cerrarModal = () => {
+    if (guardando) return
 
-    const bitmap = await createImageBitmap(file)
-    const escala = Math.min(1, configuracion.maximo / Math.max(bitmap.width, bitmap.height))
-    const ancho = Math.max(1, Math.round(bitmap.width * escala))
-    const alto = Math.max(1, Math.round(bitmap.height * escala))
+    if (preview?.startsWith('blob:')) {
+      URL.revokeObjectURL(preview)
+    }
+
+    setArchivo(null)
+    setPreview('')
+    setDescripcion('')
+    setModal(false)
+  }
+
+  const comprimirImagen = async (imagen, modo) => {
+    if (modo === 'original') return imagen
+
+    const config =
+      modo === 'media'
+        ? { maxWidth: 1600, maxHeight: 1600, quality: 0.78 }
+        : { maxWidth: 900, maxHeight: 900, quality: 0.62 }
+
+    const bitmap = await createImageBitmap(imagen)
+    const escala = Math.min(
+      1,
+      config.maxWidth / bitmap.width,
+      config.maxHeight / bitmap.height
+    )
+
+    const width = Math.max(1, Math.round(bitmap.width * escala))
+    const height = Math.max(1, Math.round(bitmap.height * escala))
 
     const canvas = document.createElement('canvas')
-    canvas.width = ancho
-    canvas.height = alto
+    canvas.width = width
+    canvas.height = height
 
-    const contexto = canvas.getContext('2d')
-    contexto.drawImage(bitmap, 0, 0, ancho, alto)
+    const ctx = canvas.getContext('2d', { alpha: false })
+    ctx.drawImage(bitmap, 0, 0, width, height)
     bitmap.close?.()
 
     const blob = await new Promise((resolve, reject) => {
       canvas.toBlob(
-        (resultado) => resultado ? resolve(resultado) : reject(new Error('No se pudo comprimir la imagen.')),
+        (resultado) =>
+          resultado
+            ? resolve(resultado)
+            : reject(new Error('No se pudo optimizar la imagen.')),
         'image/webp',
-        configuracion.calidad
+        config.quality
       )
     })
 
-    const nombreBase = file.name.replace(/\.[^.]+$/, '') || 'foto'
-    return new File([blob], `${nombreBase}.webp`, { type: 'image/webp' })
+    return new File([blob], `${Date.now()}.webp`, {
+      type: 'image/webp',
+    })
   }
 
   const guardar = async (e) => {
     e.preventDefault()
-    if (!archivo) return onMensaje('Selecciona una imagen.')
-    if (!archivo.type?.startsWith('image/')) return onMensaje('El archivo debe ser una imagen.')
+
+    if (!archivo) {
+      onMensaje('Selecciona o toma una foto.')
+      return
+    }
 
     setGuardando(true)
-    try {
-      const archivoSubida = await comprimirImagen(archivo, modoCalidad)
-      const extension = archivoSubida.name.split('.').pop()?.toLowerCase() || 'webp'
-      const nombre = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${extension}`
-      const ruta = `${session.user.id}/${acuario.id}/${nombre}`
 
-      const { error: errorUpload } = await supabase.storage.from('fotos-acuario').upload(ruta, archivoSubida, {
-        cacheControl: '3600',
-        upsert: false,
-        contentType: archivoSubida.type || undefined,
-      })
+    try {
+      const optimizada = await comprimirImagen(archivo, modoCalidad)
+
+      const extension =
+        optimizada.type === 'image/webp'
+          ? 'webp'
+          : archivo.name.split('.').pop()?.toLowerCase() || 'jpg'
+
+      const nombre =
+        `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${extension}`
+
+      const ruta =
+        `${session.user.id}/${acuario.id}/fotos/${nombre}`
+
+      const { error: errorUpload } = await supabase.storage
+        .from('fotos-acuario')
+        .upload(ruta, optimizada, {
+          cacheControl: '3600',
+          upsert: false,
+          contentType: optimizada.type,
+        })
+
       if (errorUpload) throw errorUpload
 
-      const { data: pub } = supabase.storage.from('fotos-acuario').getPublicUrl(ruta)
+      const { data: pub } = supabase.storage
+        .from('fotos-acuario')
+        .getPublicUrl(ruta)
 
-      const detalleTamano = modoCalidad === 'original'
-        ? `Original · ${formatoBytes(archivoSubida.size)}`
-        : `${modoCalidad === 'media' ? 'Calidad media' : 'Miniatura'} · ${formatoBytes(archivoSubida.size)}`
+      const { error: errorDb } = await supabase
+        .from('fotos_acuario')
+        .insert([
+          {
+            acuario_id: acuario.id,
+            url: pub.publicUrl,
+            descripcion: descripcion.trim() || null,
+          },
+        ])
 
-      const descripcionFinal = [descripcion.trim(), detalleTamano].filter(Boolean).join(' · ')
+      if (errorDb) throw errorDb
 
-      const { error: errorDb } = await supabase.from('fotos_acuario').insert([{
-        acuario_id: acuario.id,
-        url: pub.publicUrl,
-        descripcion: descripcionFinal || null,
-      }])
-      if (errorDb) {
-        await supabase.storage.from('fotos-acuario').remove([ruta])
-        throw errorDb
+      if (preview?.startsWith('blob:')) {
+        URL.revokeObjectURL(preview)
       }
 
-      setModal(false)
       setArchivo(null)
+      setPreview('')
       setDescripcion('')
-      setModoCalidad('miniatura')
+      setModal(false)
+
       await cargar()
-      onMensaje(`✅ Foto guardada. Se subió ${formatoBytes(archivoSubida.size)}; la original permanece en tu teléfono.`)
+      onMensaje('✅ Foto guardada.')
     } catch (error) {
       onMensaje(`Error: ${error.message}`)
+    } finally {
+      setGuardando(false)
     }
-    setGuardando(false)
   }
 
   const eliminar = async (item) => {
-    if (!window.confirm('¿Eliminar esta foto de NexoWeb? La foto original de tu teléfono no se borra.')) return
+    if (!window.confirm('¿Eliminar esta foto del historial?')) return
+
     try {
       const marcador = '/storage/v1/object/public/fotos-acuario/'
+
       if (item.url?.includes(marcador)) {
         const ruta = decodeURIComponent(item.url.split(marcador)[1])
         await supabase.storage.from('fotos-acuario').remove([ruta])
       }
-      const { error } = await supabase.from('fotos_acuario').delete().eq('id', item.id)
+
+      const { error } = await supabase
+        .from('fotos_acuario')
+        .delete()
+        .eq('id', item.id)
+
       if (error) throw error
-      cargar()
+
+      await cargar()
+      onMensaje('✅ Foto eliminada.')
     } catch (error) {
       onMensaje(`Error: ${error.message}`)
     }
@@ -708,40 +786,158 @@ function Fotos({ acuario, session, onMensaje }) {
 
   return (
     <div>
-      <Encabezado titulo="Fotos" descripcion="La original queda en tu teléfono; NexoWeb guarda una copia ligera." boton="+ Foto" onBoton={() => setModal(true)} />
-      <div className="aviso-fotos-locales">
-        <strong>📱 Original en tu teléfono</strong>
-        <span>Por defecto NexoWeb convierte la foto a WebP y sube una miniatura ligera para ahorrar espacio.</span>
-      </div>
+      <Encabezado
+        titulo="Fotos"
+        descripcion="Evolución visual del acuario."
+        boton="+ Foto"
+        onBoton={abrirModal}
+      />
 
-      {cargando ? <div className="sin-datos-panel">Cargando...</div> :
-       items.length === 0 ? <div className="panel-vacio"><div className="icono-vacio">📷</div><h3>No hay fotos</h3><p>Sube la primera foto de este acuario.</p></div> :
-       <div className="galeria-fotos">
-        {items.map((item) => (
-          <article className="foto-card" key={item.id}>
-            <img src={item.url} alt={item.descripcion || 'Foto del acuario'} loading="lazy" />
-            <div className="foto-info"><span>{fechaBonita(item.fecha)}</span>{item.descripcion && <p>{item.descripcion}</p>}<button className="boton-eliminar-entidad" onClick={() => eliminar(item)}>Eliminar de NexoWeb</button></div>
-          </article>
-        ))}
-      </div>}
+      {cargando ? (
+        <div className="sin-datos-panel">Cargando...</div>
+      ) : items.length === 0 ? (
+        <div className="panel-vacio">
+          <div className="icono-vacio">📷</div>
+          <h3>Aún no hay fotos</h3>
+          <p>Toma una foto o elige una de tu galería.</p>
+          <button className="boton-principal" onClick={abrirModal}>
+            Agregar primera foto
+          </button>
+        </div>
+      ) : (
+        <div className="galeria-fotos">
+          {items.map((item) => (
+            <article className="foto-card" key={item.id}>
+              <img
+                src={item.url}
+                alt={item.descripcion || 'Foto del acuario'}
+                loading="lazy"
+              />
+              <div className="foto-info">
+                <span>{fechaBonita(item.fecha)}</span>
+                {item.descripcion && <p>{item.descripcion}</p>}
+                <button
+                  className="boton-eliminar-entidad"
+                  onClick={() => eliminar(item)}
+                >
+                  Eliminar
+                </button>
+              </div>
+            </article>
+          ))}
+        </div>
+      )}
 
-      {modal && <Modal titulo="Agregar foto" subtitulo="La foto original no se modifica ni se borra de tu teléfono." onCerrar={() => setModal(false)}>
-        <form onSubmit={guardar}>
-          <div className="campo-formulario"><label>Imagen *</label><input type="file" accept="image/*" onChange={(e) => setArchivo(e.target.files?.[0] || null)} required /></div>
-          {archivo && <div className="archivo-seleccionado">📷 {archivo.name} · {formatoBytes(archivo.size)}</div>}
-          <div className="campo-formulario">
-            <label>Calidad que se guardará en NexoWeb</label>
-            <select value={modoCalidad} onChange={(e) => setModoCalidad(e.target.value)}>
-              <option value="miniatura">Solo miniatura — recomendado</option>
-              <option value="media">Calidad media</option>
-              <option value="original">Original — ocupa mucho más espacio</option>
-            </select>
-            <small className="ayuda-campo">La opción recomendada reduce la imagen antes de subirla. El original permanece en la galería del teléfono.</small>
-          </div>
-          <div className="campo-formulario"><label>Descripción</label><textarea rows="3" value={descripcion} onChange={(e) => setDescripcion(e.target.value)} placeholder="Ej. Día 10 de ciclado..." /></div>
-          <div className="acciones-modal"><button type="button" className="boton-cancelar" onClick={() => setModal(false)}>Cancelar</button><button className="boton-principal" disabled={guardando}>{guardando ? 'Procesando...' : 'Guardar foto'}</button></div>
-        </form>
-      </Modal>}
+      {modal && (
+        <Modal
+          titulo="Agregar foto"
+          subtitulo="La original permanece en tu teléfono; NexoWeb puede guardar una copia ligera."
+          onCerrar={cerrarModal}
+        >
+          <form onSubmit={guardar}>
+            {!archivo ? (
+              <div className="selector-foto-movil">
+                <label className="accion-foto-grande">
+                  <span>📷</span>
+                  <strong>Tomar foto</strong>
+                  <small>Usar la cámara del teléfono</small>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    onChange={(e) =>
+                      seleccionarArchivo(e.target.files?.[0] || null)
+                    }
+                  />
+                </label>
+
+                <label className="accion-foto-grande">
+                  <span>🖼️</span>
+                  <strong>Elegir de galería</strong>
+                  <small>Seleccionar una foto existente</small>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) =>
+                      seleccionarArchivo(e.target.files?.[0] || null)
+                    }
+                  />
+                </label>
+              </div>
+            ) : (
+              <div className="preview-foto-seleccionada">
+                <img src={preview} alt="Vista previa" />
+                <div>
+                  <strong>Foto seleccionada</strong>
+                  <small>{archivo.name}</small>
+                  <button
+                    type="button"
+                    className="boton-claro"
+                    disabled={guardando}
+                    onClick={() => {
+                      if (preview?.startsWith('blob:')) {
+                        URL.revokeObjectURL(preview)
+                      }
+                      setArchivo(null)
+                      setPreview('')
+                    }}
+                  >
+                    Cambiar foto
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <div className="campo-formulario">
+              <label>Calidad de copia en NexoWeb</label>
+              <div className="calidad-foto-opciones">
+                {[
+                  ['miniatura', 'Ligera', 'Recomendada'],
+                  ['media', 'Media', 'Más detalle'],
+                  ['original', 'Original', 'Usa más espacio'],
+                ].map(([valor, titulo, detalle]) => (
+                  <button
+                    key={valor}
+                    type="button"
+                    className={modoCalidad === valor ? 'activo' : ''}
+                    onClick={() => setModoCalidad(valor)}
+                  >
+                    <strong>{titulo}</strong>
+                    <small>{detalle}</small>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="campo-formulario">
+              <label>Descripción</label>
+              <textarea
+                rows="3"
+                value={descripcion}
+                onChange={(e) => setDescripcion(e.target.value)}
+                placeholder="Ej. Día 10 de ciclado"
+              />
+            </div>
+
+            <div className="acciones-modal">
+              <button
+                type="button"
+                className="boton-cancelar"
+                onClick={cerrarModal}
+                disabled={guardando}
+              >
+                Cancelar
+              </button>
+              <button
+                className="boton-principal"
+                disabled={guardando || !archivo}
+              >
+                {guardando ? 'Guardando...' : 'Guardar foto'}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
     </div>
   )
 }
