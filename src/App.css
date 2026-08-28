@@ -4721,3 +4721,119 @@ html.nexoweb-oscuro .acciones-modal-sticky {
     grid-template-columns: 1fr;
   }
 }
+
+
+/* ============================================================
+   NEXOWEB v1.6.0 FINAL
+   Historial / completar / reprogramar / omitir
+============================================================ */
+
+.indicadores-calendario .omitida {
+  background: #cbd5e1;
+}
+
+.modal-actividad-detalle-final {
+  width: min(94vw, 520px);
+}
+
+.acciones-actividad-final {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 7px;
+  margin: 14px 0;
+}
+
+.acciones-actividad-final button {
+  min-height: 42px;
+}
+
+.historial-actividad-final {
+  margin: 16px 0;
+  padding-top: 14px;
+  border-top: 1px solid #eaecf0;
+}
+
+.historial-actividad-final h3 {
+  margin: 0 0 9px;
+  font-size: 12px;
+}
+
+.historial-actividad-final > p {
+  margin: 0;
+  color: #667085;
+  font-size: 9px;
+}
+
+.historial-actividad-final article {
+  position: relative;
+  padding: 10px 10px 10px 17px;
+  margin-bottom: 7px;
+  background: #f8fafb;
+  border-radius: 10px;
+}
+
+.historial-actividad-final article::before {
+  content: '';
+  position: absolute;
+  left: 7px;
+  top: 14px;
+  width: 5px;
+  height: 5px;
+  background: #667085;
+  border-radius: 50%;
+}
+
+.historial-actividad-final article strong,
+.historial-actividad-final article span,
+.historial-actividad-final article p {
+  display: block;
+}
+
+.historial-actividad-final article strong {
+  text-transform: capitalize;
+  font-size: 9px;
+}
+
+.historial-actividad-final article span {
+  margin-top: 2px;
+  color: #98a2b3;
+  font-size: 7px;
+}
+
+.historial-actividad-final article p {
+  margin: 4px 0 0;
+  color: #667085;
+  font-size: 8px;
+  line-height: 1.4;
+}
+
+.modal-accion-actividad {
+  text-align: left;
+}
+
+.modal-accion-actividad > h2 {
+  text-align: center;
+}
+
+.badge-estado-actividad.reprogramada {
+  background: #eef4ff;
+  color: #3538cd;
+}
+
+html.nexoweb-oscuro .historial-actividad-final {
+  border-color: #384552;
+}
+
+html.nexoweb-oscuro .historial-actividad-final article {
+  background: #202830;
+}
+
+@media (max-width: 760px) {
+  .acciones-actividad-final {
+    grid-template-columns: 1fr;
+  }
+
+  .modal-actividad-detalle-final {
+    width: calc(100vw - 20px);
+  }
+}

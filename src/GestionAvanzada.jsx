@@ -1,7 +1,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from './lib/supabase.js'
-import { CalendarioActividades } from './ActividadesEtapa2.jsx'
+import { CalendarioActividades } from './ActividadesFinal.jsx'
 import { subirImagenPublica, formatoBytes } from './utilsImagenes.js'
 
 const fechaLocal = (fecha = new Date()) => {
@@ -2166,7 +2166,7 @@ export default function GestionAvanzada({
   if (seccion === 'configuracion') return <ConfiguracionAcuario acuario={acuario} session={session} onMensaje={onMensaje} onAcuarioActualizado={onAcuarioActualizado} modoOscuro={modoOscuro} onCambiarModo={onCambiarModo} />
   if (seccion === 'salud') return <Salud acuario={acuario} onMensaje={onMensaje} />
   if (seccion === 'rutinas') return <Rutinas acuario={acuario} onMensaje={onMensaje} />
-  if (seccion === 'calendario') return <CalendarioActividades acuario={acuario} onAgregarActividad={onAgregarActividad} />
+  if (seccion === 'calendario') return <CalendarioActividades acuario={acuario} onAgregarActividad={onAgregarActividad} onMensaje={onMensaje} onTareasCambiadas={onTareasCambiadas} />
   if (seccion === 'inventario') return <Inventario acuario={acuario} onMensaje={onMensaje} />
   if (seccion === 'costos') return <Costos acuario={acuario} onMensaje={onMensaje} />
   if (seccion === 'comparar') return <Comparar session={session} onMensaje={onMensaje} />
