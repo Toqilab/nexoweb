@@ -533,7 +533,6 @@ export function SelectorRegistroActividades({
     cargarProductos()
   }, [abierto, fechaInicial])
 
-  if (!abierto) return null
 
   const actividad = TIPOS_ACTIVIDAD.find(
     (item) => item.id === tipo
@@ -2898,6 +2897,8 @@ export function SelectorRegistroActividades({
 
     return null
   }
+
+  if (!abierto) return null
 
   return (
     <div
