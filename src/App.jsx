@@ -5,7 +5,7 @@ import ModulosExtras from './ModulosExtras.jsx'
 import GestionAvanzada, { ResumenInteligente } from './GestionAvanzada.jsx'
 import { subirImagenPublica, formatoBytes } from './utilsImagenes.js'
 
-const NEXOWEB_VERSION = '1.2.0'
+const NEXOWEB_VERSION = '1.2.1'
 
 function App() {
   /* =========================================================
@@ -610,13 +610,14 @@ function App() {
 
     if (!session?.user?.id) return
 
-    // Protección real contra doble clic / doble envío.
     if (guardandoAcuarioRef.current) return
 
     const nombreLimpio = formAcuario.nombre.trim()
 
     if (!nombreLimpio) {
-      setMensajeAcuario('⚠️ Debes ingresar el nombre del acuario.')
+      setMensajeAcuario(
+        '⚠️ Debes ingresar el nombre del acuario.'
+      )
       return
     }
 
@@ -647,27 +648,44 @@ function App() {
     setMensajeAcuario('')
     setProgresoCreacion('guardando_datos')
 
+    let acuarioCreado = null
+    let avisoFoto = ''
+
     try {
+      // 1. Primero se crea el acuario.
+      // Desde aquí ya existe realmente en Supabase.
       const { data: creado, error } = await supabase
         .from('acuarios')
         .insert([
           {
             usuario_id: session.user.id,
             nombre: nombreLimpio,
-            descripcion: formAcuario.descripcion.trim() || null,
-            volumen_litros: numeroONull(formAcuario.volumen_litros),
-            largo_cm: numeroONull(formAcuario.largo_cm),
-            ancho_cm: numeroONull(formAcuario.ancho_cm),
-            alto_cm: numeroONull(formAcuario.alto_cm),
-            tipo: formAcuario.tipo || null,
-            subtipo: formAcuario.subtipo || null,
-            ubicacion: formAcuario.ubicacion || null,
-            exposicion_solar: formAcuario.exposicion_solar || null,
-            fecha_inicio: formAcuario.fecha_inicio || null,
-            temperatura_objetivo: numeroONull(
-              formAcuario.temperatura_objetivo
-            ),
-            costo_inicial: numeroONull(formAcuario.costo_inicial),
+            descripcion:
+              formAcuario.descripcion.trim() || null,
+            volumen_litros:
+              numeroONull(formAcuario.volumen_litros),
+            largo_cm:
+              numeroONull(formAcuario.largo_cm),
+            ancho_cm:
+              numeroONull(formAcuario.ancho_cm),
+            alto_cm:
+              numeroONull(formAcuario.alto_cm),
+            tipo:
+              formAcuario.tipo || null,
+            subtipo:
+              formAcuario.subtipo || null,
+            ubicacion:
+              formAcuario.ubicacion || null,
+            exposicion_solar:
+              formAcuario.exposicion_solar || null,
+            fecha_inicio:
+              formAcuario.fecha_inicio || null,
+            temperatura_objetivo:
+              numeroONull(
+                formAcuario.temperatura_objetivo
+              ),
+            costo_inicial:
+              numeroONull(formAcuario.costo_inicial),
             estado: 'activo',
           },
         ])
@@ -676,67 +694,113 @@ function App() {
 
       if (error) throw error
 
+      acuarioCreado = creado
       let acuarioFinal = creado
 
-      if (fotoPortadaArchivo) {
-        setProgresoCreacion('procesando_foto')
-
-        const subida = await subirImagenPublica({
-          archivo: fotoPortadaArchivo,
-          usuarioId: session.user.id,
-          acuarioId: creado.id,
-          carpeta: 'portada',
-          maxWidth: 1200,
-          maxHeight: 900,
-          quality: 0.72,
-        })
-
-        const { data: actualizado, error: errorPortada } =
-          await supabase
-            .from('acuarios')
-            .update({
-              foto_portada_url: subida.url,
-              updated_at: new Date().toISOString(),
-            })
-            .eq('id', creado.id)
-            .select()
-            .single()
-
-        if (errorPortada) throw errorPortada
-
-        acuarioFinal = actualizado
-      }
-
-      setProgresoCreacion('finalizando')
-
+      // Mostrarlo inmediatamente en la lista para evitar que el usuario
+      // piense que no se guardó.
       setAcuarios((anterior) => [
-        acuarioFinal,
+        creado,
         ...anterior.filter(
-          (item) => item.id !== acuarioFinal.id
+          (item) => item.id !== creado.id
         ),
       ])
 
+      // 2. La portada es secundaria.
+      // Si falla, NO se considera que haya fallado la creación.
+      if (fotoPortadaArchivo) {
+        setProgresoCreacion('procesando_foto')
+
+        try {
+          const subida = await subirImagenPublica({
+            archivo: fotoPortadaArchivo,
+            usuarioId: session.user.id,
+            acuarioId: creado.id,
+            carpeta: 'portada',
+            maxWidth: 1200,
+            maxHeight: 900,
+            quality: 0.72,
+            usarOriginalSiFalla: true,
+          })
+
+          if (subida?.url) {
+            const {
+              data: actualizado,
+              error: errorPortada,
+            } = await supabase
+              .from('acuarios')
+              .update({
+                foto_portada_url: subida.url,
+                updated_at:
+                  new Date().toISOString(),
+              })
+              .eq('id', creado.id)
+              .select()
+              .single()
+
+            if (errorPortada) {
+              throw errorPortada
+            }
+
+            acuarioFinal = actualizado
+
+            setAcuarios((anterior) =>
+              anterior.map((item) =>
+                item.id === actualizado.id
+                  ? actualizado
+                  : item
+              )
+            )
+
+            if (!subida.optimizada) {
+              avisoFoto =
+                ' La foto se subió sin comprimir porque el navegador no pudo procesarla.'
+            }
+          }
+        } catch (errorFoto) {
+          console.warn(
+            'El acuario fue creado, pero no se pudo guardar la portada:',
+            errorFoto
+          )
+
+          avisoFoto =
+            ' La portada no pudo cargarse, pero el acuario sí fue creado. Puedes agregarla después desde Configuración.'
+        }
+      }
+
+      setProgresoCreacion('finalizando')
       setFotoPortadaArchivo(null)
       setFotoPortadaPreview('')
       setMensajeAcuario('')
 
-      // Pequeña pausa visual para que el usuario vea que terminó.
-      await new Promise((resolve) => setTimeout(resolve, 350))
-
-      setMostrarModalAcuario(false)
-      setMensaje(
-        `✅ "${acuarioFinal.nombre}" fue creado correctamente.`
+      await new Promise(
+        (resolve) => setTimeout(resolve, 300)
       )
 
+      setMostrarModalAcuario(false)
       setProgresoCreacion('')
+
+      setMensaje(
+        `✅ "${acuarioFinal.nombre}" fue creado correctamente.${avisoFoto}`
+      )
     } catch (error) {
       console.error(error)
 
-      setMensajeAcuario(
-        `❌ No se pudo crear el acuario: ${error.message}`
-      )
-
-      setProgresoCreacion('error')
+      // Si todavía no se creó ningún registro, sí es un error de creación.
+      if (!acuarioCreado) {
+        setMensajeAcuario(
+          `❌ No se pudo crear el acuario: ${error.message}`
+        )
+        setProgresoCreacion('error')
+      } else {
+        // Protección adicional: jamás decir que "no se creó"
+        // cuando el registro ya existe.
+        setMostrarModalAcuario(false)
+        setMensaje(
+          `✅ "${acuarioCreado.nombre}" fue creado. ` +
+          'Hubo un problema secundario al finalizar, pero no vuelvas a crearlo.'
+        )
+      }
     } finally {
       guardandoAcuarioRef.current = false
       setGuardandoAcuario(false)

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from './lib/supabase.js'
+import { subirImagenPublica } from './utilsImagenes.js'
 import GestionDatos from './GestionDatos.jsx'
 
 const hoy = () => {
@@ -596,6 +597,7 @@ function Fotos({ acuario, session, onMensaje }) {
 
   const cargar = async () => {
     setCargando(true)
+
     const { data, error } = await supabase
       .from('fotos_acuario')
       .select('*')
@@ -649,48 +651,6 @@ function Fotos({ acuario, session, onMensaje }) {
     setModal(false)
   }
 
-  const comprimirImagen = async (imagen, modo) => {
-    if (modo === 'original') return imagen
-
-    const config =
-      modo === 'media'
-        ? { maxWidth: 1600, maxHeight: 1600, quality: 0.78 }
-        : { maxWidth: 900, maxHeight: 900, quality: 0.62 }
-
-    const bitmap = await createImageBitmap(imagen)
-    const escala = Math.min(
-      1,
-      config.maxWidth / bitmap.width,
-      config.maxHeight / bitmap.height
-    )
-
-    const width = Math.max(1, Math.round(bitmap.width * escala))
-    const height = Math.max(1, Math.round(bitmap.height * escala))
-
-    const canvas = document.createElement('canvas')
-    canvas.width = width
-    canvas.height = height
-
-    const ctx = canvas.getContext('2d', { alpha: false })
-    ctx.drawImage(bitmap, 0, 0, width, height)
-    bitmap.close?.()
-
-    const blob = await new Promise((resolve, reject) => {
-      canvas.toBlob(
-        (resultado) =>
-          resultado
-            ? resolve(resultado)
-            : reject(new Error('No se pudo optimizar la imagen.')),
-        'image/webp',
-        config.quality
-      )
-    })
-
-    return new File([blob], `${Date.now()}.webp`, {
-      type: 'image/webp',
-    })
-  }
-
   const guardar = async (e) => {
     e.preventDefault()
 
@@ -702,40 +662,67 @@ function Fotos({ acuario, session, onMensaje }) {
     setGuardando(true)
 
     try {
-      const optimizada = await comprimirImagen(archivo, modoCalidad)
+      const config =
+        modoCalidad === 'original'
+          ? {
+              maxWidth: 10000,
+              maxHeight: 10000,
+              quality: 1,
+            }
+          : modoCalidad === 'media'
+          ? {
+              maxWidth: 1600,
+              maxHeight: 1600,
+              quality: 0.78,
+            }
+          : {
+              maxWidth: 900,
+              maxHeight: 900,
+              quality: 0.62,
+            }
 
-      const extension =
-        optimizada.type === 'image/webp'
-          ? 'webp'
-          : archivo.name.split('.').pop()?.toLowerCase() || 'jpg'
+      let subida = null
 
-      const nombre =
-        `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${extension}`
-
-      const ruta =
-        `${session.user.id}/${acuario.id}/fotos/${nombre}`
-
-      const { error: errorUpload } = await supabase.storage
-        .from('fotos-acuario')
-        .upload(ruta, optimizada, {
-          cacheControl: '3600',
-          upsert: false,
-          contentType: optimizada.type,
+      if (modoCalidad === 'original') {
+        // Incluso en "Original" se usa el helper porque sabe
+        // conservar el archivo original cuando no puede decodificarlo.
+        subida = await subirImagenPublica({
+          archivo,
+          usuarioId: session.user.id,
+          acuarioId: acuario.id,
+          carpeta: 'fotos',
+          maxWidth: config.maxWidth,
+          maxHeight: config.maxHeight,
+          quality: config.quality,
+          usarOriginalSiFalla: true,
         })
+      } else {
+        subida = await subirImagenPublica({
+          archivo,
+          usuarioId: session.user.id,
+          acuarioId: acuario.id,
+          carpeta: 'fotos',
+          maxWidth: config.maxWidth,
+          maxHeight: config.maxHeight,
+          quality: config.quality,
+          usarOriginalSiFalla: true,
+        })
+      }
 
-      if (errorUpload) throw errorUpload
-
-      const { data: pub } = supabase.storage
-        .from('fotos-acuario')
-        .getPublicUrl(ruta)
+      if (!subida?.url) {
+        throw new Error(
+          'No se obtuvo la dirección de la fotografía.'
+        )
+      }
 
       const { error: errorDb } = await supabase
         .from('fotos_acuario')
         .insert([
           {
             acuario_id: acuario.id,
-            url: pub.publicUrl,
-            descripcion: descripcion.trim() || null,
+            url: subida.url,
+            descripcion:
+              descripcion.trim() || null,
           },
         ])
 
@@ -751,23 +738,42 @@ function Fotos({ acuario, session, onMensaje }) {
       setModal(false)
 
       await cargar()
-      onMensaje('✅ Foto guardada.')
+
+      onMensaje(
+        subida.optimizada
+          ? '✅ Foto guardada.'
+          : '✅ Foto guardada. El teléfono no pudo comprimirla y se utilizó el archivo original.'
+      )
     } catch (error) {
-      onMensaje(`Error: ${error.message}`)
+      onMensaje(
+        `❌ No se pudo guardar la foto: ${error.message}`
+      )
     } finally {
       setGuardando(false)
     }
   }
 
   const eliminar = async (item) => {
-    if (!window.confirm('¿Eliminar esta foto del historial?')) return
+    if (
+      !window.confirm(
+        '¿Eliminar esta foto del historial?'
+      )
+    ) {
+      return
+    }
 
     try {
-      const marcador = '/storage/v1/object/public/fotos-acuario/'
+      const marcador =
+        '/storage/v1/object/public/fotos-acuario/'
 
       if (item.url?.includes(marcador)) {
-        const ruta = decodeURIComponent(item.url.split(marcador)[1])
-        await supabase.storage.from('fotos-acuario').remove([ruta])
+        const ruta = decodeURIComponent(
+          item.url.split(marcador)[1]
+        )
+
+        await supabase.storage
+          .from('fotos-acuario')
+          .remove([ruta])
       }
 
       const { error } = await supabase
@@ -794,28 +800,48 @@ function Fotos({ acuario, session, onMensaje }) {
       />
 
       {cargando ? (
-        <div className="sin-datos-panel">Cargando...</div>
+        <div className="sin-datos-panel">
+          Cargando...
+        </div>
       ) : items.length === 0 ? (
         <div className="panel-vacio">
           <div className="icono-vacio">📷</div>
           <h3>Aún no hay fotos</h3>
-          <p>Toma una foto o elige una de tu galería.</p>
-          <button className="boton-principal" onClick={abrirModal}>
+          <p>
+            Toma una foto o elige una de tu galería.
+          </p>
+          <button
+            className="boton-principal"
+            onClick={abrirModal}
+          >
             Agregar primera foto
           </button>
         </div>
       ) : (
         <div className="galeria-fotos">
           {items.map((item) => (
-            <article className="foto-card" key={item.id}>
+            <article
+              className="foto-card"
+              key={item.id}
+            >
               <img
                 src={item.url}
-                alt={item.descripcion || 'Foto del acuario'}
+                alt={
+                  item.descripcion ||
+                  'Foto del acuario'
+                }
                 loading="lazy"
               />
+
               <div className="foto-info">
-                <span>{fechaBonita(item.fecha)}</span>
-                {item.descripcion && <p>{item.descripcion}</p>}
+                <span>
+                  {fechaBonita(item.fecha)}
+                </span>
+
+                {item.descripcion && (
+                  <p>{item.descripcion}</p>
+                )}
+
                 <button
                   className="boton-eliminar-entidad"
                   onClick={() => eliminar(item)}
@@ -831,7 +857,7 @@ function Fotos({ acuario, session, onMensaje }) {
       {modal && (
         <Modal
           titulo="Agregar foto"
-          subtitulo="La original permanece en tu teléfono; NexoWeb puede guardar una copia ligera."
+          subtitulo="La original permanece en tu teléfono; NexoWeb guarda una copia para verla desde cualquier dispositivo."
           onCerrar={cerrarModal}
         >
           <form onSubmit={guardar}>
@@ -840,44 +866,72 @@ function Fotos({ acuario, session, onMensaje }) {
                 <label className="accion-foto-grande">
                   <span>📷</span>
                   <strong>Tomar foto</strong>
-                  <small>Usar la cámara del teléfono</small>
+                  <small>
+                    Usar la cámara del teléfono
+                  </small>
+
                   <input
                     type="file"
                     accept="image/*"
                     capture="environment"
                     onChange={(e) =>
-                      seleccionarArchivo(e.target.files?.[0] || null)
+                      seleccionarArchivo(
+                        e.target.files?.[0] ||
+                        null
+                      )
                     }
                   />
                 </label>
 
                 <label className="accion-foto-grande">
                   <span>🖼️</span>
-                  <strong>Elegir de galería</strong>
-                  <small>Seleccionar una foto existente</small>
+                  <strong>
+                    Elegir de galería
+                  </strong>
+                  <small>
+                    Seleccionar una foto existente
+                  </small>
+
                   <input
                     type="file"
                     accept="image/*"
                     onChange={(e) =>
-                      seleccionarArchivo(e.target.files?.[0] || null)
+                      seleccionarArchivo(
+                        e.target.files?.[0] ||
+                        null
+                      )
                     }
                   />
                 </label>
               </div>
             ) : (
               <div className="preview-foto-seleccionada">
-                <img src={preview} alt="Vista previa" />
+                <img
+                  src={preview}
+                  alt="Vista previa"
+                />
+
                 <div>
-                  <strong>Foto seleccionada</strong>
+                  <strong>
+                    Foto seleccionada
+                  </strong>
                   <small>{archivo.name}</small>
+
                   <button
                     type="button"
                     className="boton-claro"
                     disabled={guardando}
                     onClick={() => {
-                      if (preview?.startsWith('blob:')) {
-                        URL.revokeObjectURL(preview)
+                      if (
+                        preview?.startsWith(
+                          'blob:'
+                        )
+                      ) {
+                        URL.revokeObjectURL(
+                          preview
+                        )
                       }
+
                       setArchivo(null)
                       setPreview('')
                     }}
@@ -889,32 +943,73 @@ function Fotos({ acuario, session, onMensaje }) {
             )}
 
             <div className="campo-formulario">
-              <label>Calidad de copia en NexoWeb</label>
+              <label>
+                Calidad de copia en NexoWeb
+              </label>
+
               <div className="calidad-foto-opciones">
                 {[
-                  ['miniatura', 'Ligera', 'Recomendada'],
-                  ['media', 'Media', 'Más detalle'],
-                  ['original', 'Original', 'Usa más espacio'],
-                ].map(([valor, titulo, detalle]) => (
-                  <button
-                    key={valor}
-                    type="button"
-                    className={modoCalidad === valor ? 'activo' : ''}
-                    onClick={() => setModoCalidad(valor)}
-                  >
-                    <strong>{titulo}</strong>
-                    <small>{detalle}</small>
-                  </button>
-                ))}
+                  [
+                    'miniatura',
+                    'Ligera',
+                    'Recomendada',
+                  ],
+                  [
+                    'media',
+                    'Media',
+                    'Más detalle',
+                  ],
+                  [
+                    'original',
+                    'Original',
+                    'Usa más espacio',
+                  ],
+                ].map(
+                  ([
+                    valor,
+                    titulo,
+                    detalle,
+                  ]) => (
+                    <button
+                      key={valor}
+                      type="button"
+                      className={
+                        modoCalidad ===
+                        valor
+                          ? 'activo'
+                          : ''
+                      }
+                      onClick={() =>
+                        setModoCalidad(
+                          valor
+                        )
+                      }
+                    >
+                      <strong>
+                        {titulo}
+                      </strong>
+                      <small>
+                        {detalle}
+                      </small>
+                    </button>
+                  )
+                )}
               </div>
             </div>
 
             <div className="campo-formulario">
-              <label>Descripción</label>
+              <label>
+                Descripción
+              </label>
+
               <textarea
                 rows="3"
                 value={descripcion}
-                onChange={(e) => setDescripcion(e.target.value)}
+                onChange={(e) =>
+                  setDescripcion(
+                    e.target.value
+                  )
+                }
                 placeholder="Ej. Día 10 de ciclado"
               />
             </div>
@@ -928,11 +1023,17 @@ function Fotos({ acuario, session, onMensaje }) {
               >
                 Cancelar
               </button>
+
               <button
                 className="boton-principal"
-                disabled={guardando || !archivo}
+                disabled={
+                  guardando ||
+                  !archivo
+                }
               >
-                {guardando ? 'Guardando...' : 'Guardar foto'}
+                {guardando
+                  ? 'Guardando...'
+                  : 'Guardar foto'}
               </button>
             </div>
           </form>
