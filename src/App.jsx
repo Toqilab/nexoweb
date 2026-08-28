@@ -4,9 +4,9 @@ import './App.css'
 import ModulosExtras from './ModulosExtras.jsx'
 import GestionAvanzada, { ResumenInteligente } from './GestionAvanzada.jsx'
 import { subirImagenPublica, formatoBytes } from './utilsImagenes.js'
-import { SelectorRegistroActividades } from './ActividadesEtapa1.jsx'
+import { SelectorRegistroActividades } from './ActividadesEtapa2.jsx'
 
-const NEXOWEB_VERSION = '1.4.0'
+const NEXOWEB_VERSION = '1.5.0'
 
 const portadaDefaultAcuario = (tipo = '') => {
   const valor = String(tipo || '').toLowerCase()

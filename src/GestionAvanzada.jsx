@@ -1,7 +1,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from './lib/supabase.js'
-import { CalendarioActividades } from './ActividadesEtapa1.jsx'
+import { CalendarioActividades } from './ActividadesEtapa2.jsx'
 import { subirImagenPublica, formatoBytes } from './utilsImagenes.js'
 
 const fechaLocal = (fecha = new Date()) => {
