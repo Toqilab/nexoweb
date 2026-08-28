@@ -4,8 +4,9 @@ import './App.css'
 import ModulosExtras from './ModulosExtras.jsx'
 import GestionAvanzada, { ResumenInteligente } from './GestionAvanzada.jsx'
 import { subirImagenPublica, formatoBytes } from './utilsImagenes.js'
+import { SelectorRegistroActividades } from './ActividadesEtapa1.jsx'
 
-const NEXOWEB_VERSION = '1.3.0'
+const NEXOWEB_VERSION = '1.4.0'
 
 const portadaDefaultAcuario = (tipo = '') => {
   const valor = String(tipo || '').toLowerCase()
@@ -260,6 +261,7 @@ function App() {
   ========================================================= */
 
   const [mostrarRegistroRapido, setMostrarRegistroRapido] = useState(false)
+  const [fechaRegistroActividad, setFechaRegistroActividad] = useState('')
 
   /* =========================================================
      INSTALACIÓN PWA
@@ -3138,8 +3140,30 @@ function App() {
      REGISTRO RÁPIDO
   ========================================================= */
 
-  const abrirRegistroRapido = () => {
+  const abrirRegistroRapido = (fecha = '') => {
+    setFechaRegistroActividad(fecha || '')
     setMostrarRegistroRapido(true)
+  }
+
+  const omitirTarea = async (tarea) => {
+    if (!tarea?.id) return
+
+    const { error } = await supabase
+      .from('tareas_acuario')
+      .update({
+        estado: 'omitida',
+        omitida_en: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', tarea.id)
+
+    if (error) {
+      setMensaje(`❌ Error: ${error.message}`)
+      return
+    }
+
+    await cargarTareas()
+    setMensaje('Actividad marcada como omitida.')
   }
 
   /* =========================================================
@@ -3355,28 +3379,24 @@ function App() {
   ========================================================= */
 
   const renderTarea = (tarea, vencida = false) => {
-    const completada =
-      tarea.estado === 'completada'
+    const completada = tarea.estado === 'completada'
+    const omitida = tarea.estado === 'omitida'
+    const hora = tarea.fecha_programada
+      ? new Date(tarea.fecha_programada).toLocaleTimeString('es-EC', {
+          hour: '2-digit',
+          minute: '2-digit',
+        })
+      : '—'
 
     return (
       <div
-        className={`tarea-hoy ${
-          vencida
-            ? 'tarea-vencida'
-            : ''
-        } ${
-          completada
-            ? 'tarea-completada'
-            : ''
-        }`}
+        className={`tarea-hoy ${vencida ? 'tarea-vencida' : ''} ${completada ? 'tarea-completada' : ''} ${omitida ? 'tarea-omitida' : ''}`}
         key={tarea.id}
       >
+        <div className="tarea-hoy-hora">{hora}</div>
+
         <div className="tarea-icono">
-          {completada
-            ? '✅'
-            : iconoTipoTarea(
-                tarea.tipo
-              )}
+          {completada ? '✅' : omitida ? '⏭️' : iconoTipoTarea(tarea.tipo)}
         </div>
 
         <div className="tarea-info">
@@ -3384,50 +3404,44 @@ function App() {
             {vencida
               ? 'VENCIDO'
               : completada
-              ? 'COMPLETADO'
-              : `DÍA ${
-                  tarea.dia_ciclado ||
-                  diasCiclado
-                }`}
+              ? 'COMPLETADA'
+              : omitida
+              ? 'OMITIDA'
+              : 'PENDIENTE'}
           </span>
 
-          <strong>
-            {tarea.titulo}
-          </strong>
+          <strong>{tarea.titulo}</strong>
 
           {tarea.dosis_calculada && (
             <small>
-              {Number(
-                tarea.dosis_calculada
-              ).toFixed(2)}{' '}
-              {tarea.unidad}
-              {tarea.volumen_litros
-                ? ` · ${tarea.volumen_litros} L`
-                : ''}
+              {Number(tarea.dosis_calculada).toFixed(2)} {tarea.unidad}
+              {tarea.volumen_litros ? ` · ${tarea.volumen_litros} L` : ''}
             </small>
           )}
 
-          {tarea.descripcion && (
-            <small>
-              {tarea.descripcion}
-            </small>
-          )}
+          {tarea.descripcion && <small>{tarea.descripcion}</small>}
         </div>
 
-        {!completada && (
-          <button
-            className="boton-tarea"
-            onClick={() =>
-              accionTarea(tarea)
-            }
-          >
-            {tarea.tipo === 'producto'
-              ? 'Aplicar'
-              : tarea.tipo ===
-                'medicion_agua'
-              ? 'Registrar'
-              : 'Hecho'}
-          </button>
+        {!completada && !omitida && (
+          <div className="acciones-tarea-hoy">
+            <button
+              className="boton-tarea"
+              onClick={() => accionTarea(tarea)}
+            >
+              {tarea.tipo === 'medicion_agua'
+                ? 'Registrar valores'
+                : tarea.tipo === 'producto'
+                ? 'Aplicar'
+                : 'Completar'}
+            </button>
+
+            <button
+              className="boton-omitir-tarea"
+              onClick={() => omitirTarea(tarea)}
+            >
+              Omitir
+            </button>
+          </div>
         )}
       </div>
     )
@@ -3553,11 +3567,9 @@ function App() {
 
             <button
               className="boton-programar-hoy"
-              onClick={() =>
-                setSeccionActiva('calendario')
-              }
+              onClick={() => abrirRegistroRapido(fechaHoy())}
             >
-              + Programar
+              + Agregar actividad
             </button>
 
             {tareasHoy.length > 0 && (
@@ -3576,8 +3588,14 @@ function App() {
               Cargando...
             </div>
           ) : tareasHoy.length === 0 ? (
-            <div className="sin-datos-panel">
-              No tienes actividades programadas para hoy.
+            <div className="sin-datos-panel estado-vacio-hoy">
+              <p>No tienes actividades programadas para hoy.</p>
+              <button
+                className="boton-principal"
+                onClick={() => abrirRegistroRapido(fechaHoy())}
+              >
+                + Agregar actividad
+              </button>
             </div>
           ) : (
             <div className="lista-tareas-hoy">
@@ -3799,6 +3817,7 @@ function App() {
           modoOscuro={modoOscuro}
           onCambiarModo={cambiarModoOscuro}
           onTareasCambiadas={cargarTareas}
+          onAgregarActividad={(fecha) => abrirRegistroRapido(fecha)}
         />
       )
     }
@@ -5558,118 +5577,18 @@ function App() {
             REGISTRO RÁPIDO
         ================================================= */}
 
-        {mostrarRegistroRapido && (
-          <div className="modal-overlay">
-            <div className="modal-acuario modal-registro-rapido">
-              <div className="modal-cabecera">
-                <div>
-                  <h2>¿Qué vas a registrar?</h2>
-                  <p>Acciones rápidas para usar desde el celular.</p>
-                </div>
+        <SelectorRegistroActividades
+          abierto={mostrarRegistroRapido}
+          acuario={acuarioSeleccionado}
+          fechaInicial={fechaRegistroActividad}
+          onCerrar={() => {
+            setMostrarRegistroRapido(false)
+            setFechaRegistroActividad('')
+          }}
+          onGuardado={cargarTareas}
+          onMensaje={setMensaje}
+        />
 
-                <button
-                  className="boton-cerrar-modal"
-                  onClick={() => setMostrarRegistroRapido(false)}
-                >
-                  ×
-                </button>
-              </div>
-
-              <div className="grid-registro-rapido">
-                <button
-                  onClick={() => {
-                    setSeccionActiva('agua')
-                    abrirRegistroAgua()
-                  }}
-                >
-                  <span>💧</span>
-                  <strong>Medición de agua</strong>
-                </button>
-
-                <button
-                  onClick={() => {
-                    setSeccionActiva('mantenimiento')
-                    abrirMantenimiento('Cambio de agua')
-                  }}
-                >
-                  <span>🔄</span>
-                  <strong>Cambio de agua</strong>
-                </button>
-
-                <button
-                  onClick={() => {
-                    setMostrarRegistroRapido(false)
-                    setSeccionActiva('productos')
-                  }}
-                >
-                  <span>🧪</span>
-                  <strong>Producto / dosis</strong>
-                </button>
-
-                <button
-                  onClick={() => {
-                    setMostrarRegistroRapido(false)
-                    setSeccionActiva('calendario')
-                  }}
-                >
-                  <span>📅</span>
-                  <strong>Programar actividad</strong>
-                </button>
-
-                <button
-                  onClick={() => {
-                    setMostrarRegistroRapido(false)
-                    abrirPlanCiclado()
-                  }}
-                  disabled={!cicladoActivo}
-                >
-                  <span>📋</span>
-                  <strong>Plan de ciclado</strong>
-                </button>
-
-                <button
-                  onClick={() => {
-                    setMostrarRegistroRapido(false)
-                    setSeccionActiva('alimentacion')
-                  }}
-                >
-                  <span>🍽️</span>
-                  <strong>Alimentación</strong>
-                </button>
-
-                <button
-                  onClick={() => {
-                    setMostrarRegistroRapido(false)
-                    setSeccionActiva('notas')
-                  }}
-                >
-                  <span>📝</span>
-                  <strong>Nota</strong>
-                </button>
-
-                <button
-                  onClick={() => {
-                    setMostrarRegistroRapido(false)
-                    setSeccionActiva('habitantes')
-                  }}
-                >
-                  <span>🐟</span>
-                  <strong>Habitante</strong>
-                </button>
-
-                <button
-                  onClick={() => {
-                    setMostrarRegistroRapido(false)
-                    setSeccionActiva('plantas')
-                  }}
-                >
-                  <span>🌿</span>
-                  <strong>Planta</strong>
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* =================================================
             MEDICIÓN DE AGUA

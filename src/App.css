@@ -4030,3 +4030,298 @@ html.nexoweb-oscuro .calendario-ayuda {
     font-size: 20px;
   }
 }
+
+/* ============================================================
+   NEXOWEB v1.4.0 - ETAPA 1
+   Inicio / Registrar / Calendario separados
+============================================================ */
+
+.registro-sheet-overlay {
+  align-items: flex-end;
+  padding: 0;
+}
+
+.registro-sheet {
+  width: min(100%, 720px);
+  max-height: 90vh;
+  margin: 0 auto;
+  overflow-y: auto;
+  background: #fff;
+  border-radius: 24px 24px 0 0;
+  padding: 10px 18px calc(24px + env(safe-area-inset-bottom));
+  box-shadow: 0 -20px 60px rgba(16,24,40,.18);
+}
+
+.registro-sheet-handle {
+  width: 44px;
+  height: 5px;
+  margin: 0 auto 14px;
+  border-radius: 999px;
+  background: #d0d5dd;
+}
+
+.registro-sheet-cabecera {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.registro-sheet-cabecera h2 { margin: 0; }
+.registro-sheet-cabecera p { margin: 4px 0 0; color: #667085; font-size: 11px; }
+
+.selector-actividades-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 9px;
+}
+
+.selector-actividades-grid button {
+  min-height: 92px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 7px;
+  padding: 14px;
+  border: 1px solid #eaecf0;
+  background: #fff;
+  border-radius: 15px;
+  text-align: left;
+}
+
+.selector-actividades-grid button > span { font-size: 26px; }
+.selector-actividades-grid button strong { font-size: 12px; }
+
+.fecha-rapida-selector {
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.fecha-rapida-selector > button,
+.fecha-rapida-selector > label {
+  min-height: 44px;
+  border: 1px solid #d0d5dd;
+  background: #fff;
+  border-radius: 10px;
+  padding: 9px 11px;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.fecha-rapida-selector > button.activo {
+  border-color: #17212b;
+  background: #17212b;
+  color: #fff;
+}
+
+.fecha-rapida-selector > label {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.fecha-rapida-selector input[type='date'] {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.tarea-hoy {
+  display: grid;
+  grid-template-columns: 58px 42px 1fr auto;
+  align-items: center;
+  gap: 10px;
+}
+
+.tarea-hoy-hora {
+  font-size: 11px;
+  font-weight: 800;
+  color: #344054;
+  text-align: center;
+}
+
+.acciones-tarea-hoy {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.boton-omitir-tarea {
+  border: 1px solid #eaecf0;
+  background: #fff;
+  color: #667085;
+  border-radius: 9px;
+  padding: 8px 10px;
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.tarea-omitida { opacity: .65; }
+.estado-vacio-hoy p { margin: 0 0 12px; }
+
+.calendario-grid-etapa1 { gap: 4px; }
+
+.calendario-dia-compacto {
+  min-height: 68px;
+  border: 1px solid #eaecf0;
+  background: #fff;
+  border-radius: 10px;
+  padding: 7px;
+  text-align: left;
+}
+
+.calendario-dia-compacto.hoy { box-shadow: inset 0 0 0 2px #17212b; }
+.calendario-dia-compacto.seleccionado { background: #eef4ff; border-color: #84adff; }
+
+.indicadores-calendario {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 10px;
+}
+
+.indicadores-calendario > span {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+}
+
+.indicadores-calendario .azul { background: #5b8def; }
+.indicadores-calendario .verde { background: #46a36f; }
+.indicadores-calendario .rosa { background: #d66b8d; }
+.indicadores-calendario .naranja { background: #e9a23b; }
+.indicadores-calendario .completada { background: #98a2b3; }
+.indicadores-calendario small { color: #667085; font-size: 8px; }
+
+.detalle-dia-calendario {
+  margin-top: 16px;
+  padding: 16px;
+  background: #fff;
+  border: 1px solid #eaecf0;
+  border-radius: 16px;
+}
+
+.detalle-dia-cabecera {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: flex-start;
+  margin-bottom: 14px;
+}
+
+.detalle-dia-cabecera span {
+  display: block;
+  color: #667085;
+  font-size: 9px;
+  text-transform: uppercase;
+  font-weight: 800;
+}
+
+.detalle-dia-cabecera h3 { margin: 3px 0 0; text-transform: capitalize; }
+.detalle-dia-cabecera > strong { color: #667085; font-size: 10px; }
+
+.estado-vacio-dia {
+  text-align: center;
+  padding: 26px 14px;
+  border: 1px dashed #d0d5dd;
+  border-radius: 13px;
+}
+
+.estado-vacio-dia > span { font-size: 28px; }
+.estado-vacio-dia h4 { margin: 8px 0 14px; color: #667085; }
+
+.lista-actividades-dia { display: flex; flex-direction: column; gap: 8px; }
+
+.actividad-dia-card {
+  display: grid;
+  grid-template-columns: 58px 1fr auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid #eaecf0;
+  border-radius: 12px;
+}
+
+.actividad-dia-hora { font-size: 11px; font-weight: 800; color: #344054; }
+.actividad-dia-info p { margin: 4px 0 6px; color: #667085; font-size: 9px; }
+
+.badge-estado-actividad {
+  display: inline-flex;
+  padding: 4px 7px;
+  border-radius: 999px;
+  font-size: 8px;
+  font-weight: 800;
+  text-transform: capitalize;
+}
+
+.badge-estado-actividad.pendiente { background: #fff7e8; color: #b54708; }
+.badge-estado-actividad.completada { background: #ecfdf3; color: #027a48; }
+.badge-estado-actividad.omitida { background: #f2f4f7; color: #667085; }
+
+.boton-agregar-dia {
+  width: 100%;
+  min-height: 44px;
+  border: 1px dashed #98a2b3;
+  background: #fff;
+  border-radius: 11px;
+  color: #344054;
+  font-weight: 800;
+}
+
+html.nexoweb-oscuro .registro-sheet,
+html.nexoweb-oscuro .selector-actividades-grid button,
+html.nexoweb-oscuro .fecha-rapida-selector > button,
+html.nexoweb-oscuro .fecha-rapida-selector > label,
+html.nexoweb-oscuro .calendario-dia-compacto,
+html.nexoweb-oscuro .detalle-dia-calendario,
+html.nexoweb-oscuro .actividad-dia-card,
+html.nexoweb-oscuro .boton-agregar-dia,
+html.nexoweb-oscuro .boton-omitir-tarea {
+  background: #171d23;
+  color: #edf2f7;
+  border-color: #384552;
+}
+
+html.nexoweb-oscuro .calendario-dia-compacto.seleccionado {
+  background: #202f44;
+  border-color: #5b8def;
+}
+
+@media (max-width: 760px) {
+  .registro-sheet { width: 100%; max-height: 88vh; }
+  .selector-actividades-grid { grid-template-columns: 1fr 1fr; }
+  .fecha-rapida-selector { grid-template-columns: 1fr 1fr; }
+  .fecha-rapida-selector > label { grid-column: 1 / -1; }
+
+  .tarea-hoy {
+    grid-template-columns: 46px 36px 1fr;
+  }
+
+  .tarea-hoy > .acciones-tarea-hoy {
+    grid-column: 1 / -1;
+    justify-content: flex-end;
+  }
+
+  .calendario-dia-compacto { min-height: 58px; padding: 5px; }
+
+  .actividad-dia-card {
+    grid-template-columns: 48px 1fr;
+  }
+
+  .actividad-dia-card > button {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+}
+
+@media (max-width: 390px) {
+  .selector-actividades-grid { gap: 7px; }
+  .selector-actividades-grid button { min-height: 82px; padding: 11px; }
+  .selector-actividades-grid button strong { font-size: 11px; }
+  .calendario-dia-compacto { min-height: 54px; }
+}
