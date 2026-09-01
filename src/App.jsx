@@ -1,12 +1,18 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from './lib/supabase.js'
 import './App.css'
-import ModulosExtras from './ModulosExtras.jsx'
-import GestionAvanzada, { ResumenInteligente } from './GestionAvanzada.jsx'
 import { subirImagenPublica, formatoBytes } from './utilsImagenes.js'
-import { SelectorRegistroActividades } from './ActividadesFinal.jsx'
 
-const NEXOWEB_VERSION = '1.6.0'
+const ModulosExtras = lazy(() => import('./ModulosExtras.jsx'))
+const GestionAvanzada = lazy(() => import('./GestionAvanzada.jsx'))
+const ResumenInteligente = lazy(() =>
+  import('./GestionAvanzada.jsx').then((modulo) => ({ default: modulo.ResumenInteligente }))
+)
+const SelectorRegistroActividades = lazy(() =>
+  import('./ActividadesFinal.jsx').then((modulo) => ({ default: modulo.SelectorRegistroActividades }))
+)
+
+const NEXOWEB_VERSION = '1.7.0'
 
 const portadaDefaultAcuario = (tipo = '') => {
   const valor = String(tipo || '').toLowerCase()
@@ -688,9 +694,6 @@ function App() {
       cargarCicloAcuario(),
       cargarProductosAcuario(),
       cargarTareas(),
-      cargarMedicionesAgua(),
-      cargarMantenimientos(),
-      cargarHistorialGeneral(),
     ])
   }
 
@@ -3916,10 +3919,29 @@ function App() {
     },
   ]
 
+  const seccionesMasMovil = [
+    {
+      grupo: 'Habitantes y cuidado',
+      items: [
+        { id: 'habitantes', nombre: 'Habitantes', icono: '🐟' },
+        { id: 'mantenimiento', nombre: 'Mantenimiento', icono: '🧽' },
+      ],
+    },
+    ...seccionesMas,
+  ]
+
   const secciones = [
     ...seccionesPrincipales,
     ...seccionesMas.flatMap((grupo) => grupo.items),
   ]
+
+  useEffect(() => {
+    if (!acuarioSeleccionado?.id) return
+
+    if (seccionActiva === 'agua') cargarMedicionesAgua()
+    if (seccionActiva === 'mantenimiento') cargarMantenimientos()
+    if (seccionActiva === 'historial') cargarHistorialGeneral()
+  }, [seccionActiva, acuarioSeleccionado?.id])
 
   const renderContenidoEscritorio = () => {
     if (
@@ -4396,7 +4418,7 @@ function App() {
 
           <button
             className={
-              seccionesMas
+              seccionesMasMovil
                 .flatMap((grupo) => grupo.items)
                 .some((item) => item.id === seccionActiva)
                 ? 'activo'
@@ -4457,7 +4479,7 @@ function App() {
                   </button>
                 )}
 
-                {seccionesMas.map((grupo) => (
+                {seccionesMasMovil.map((grupo) => (
                   <section
                     className="menu-mas-movil-grupo"
                     key={grupo.grupo}

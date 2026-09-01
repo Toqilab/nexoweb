@@ -1781,6 +1781,22 @@ button {
   to { opacity: 1; transform: translateY(0); }
 }
 
+.spinner-carga {
+  width: 38px;
+  height: 38px;
+  border: 4px solid #d5e8ee;
+  border-top-color: #1687a1;
+  border-radius: 50%;
+  animation: giro-carga 700ms linear infinite;
+}
+
+@keyframes giro-carga { to { transform: rotate(360deg); } }
+
+.pantalla-carga {
+  gap: 8px;
+  min-height: 100dvh;
+}
+
 .campo-formulario label,
 .entidad-datos span,
 .producto-info span,
