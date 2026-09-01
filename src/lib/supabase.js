@@ -1,12 +1,12 @@
 import { createClient } from '@supabase/supabase-js'
 
-console.log('URL Supabase:', import.meta.env.VITE_SUPABASE_URL)
-console.log(
-  'Publishable key detectada:',
-  Boolean(import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY)
-)
-
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY
+
+if (!supabaseUrl || !supabaseKey) {
+  throw new Error(
+    'Faltan VITE_SUPABASE_URL o VITE_SUPABASE_PUBLISHABLE_KEY.'
+  )
+}
 
 export const supabase = createClient(supabaseUrl, supabaseKey)

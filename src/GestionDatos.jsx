@@ -43,7 +43,7 @@ const convertirCsv = (filas) => {
   return `${cabecera}\n${cuerpo}`
 }
 
-export default function GestionDatos({ session, acuario, onMensaje }) {
+export default function GestionDatos({ session, onMensaje }) {
   const [cargando, setCargando] = useState(false)
   const [resumen, setResumen] = useState({
     bytesDatos: 0,

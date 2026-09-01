@@ -170,6 +170,8 @@ function App() {
 
   const [mostrarModalProducto, setMostrarModalProducto] = useState(false)
   const [guardandoProducto, setGuardandoProducto] = useState(false)
+  const [productoEditando, setProductoEditando] = useState(null)
+  const [eliminandoProductoId, setEliminandoProductoId] = useState(null)
 
   const [formProducto, setFormProducto] = useState({
     nombre: '',
@@ -262,6 +264,7 @@ function App() {
 
   const [mostrarRegistroRapido, setMostrarRegistroRapido] = useState(false)
   const [fechaRegistroActividad, setFechaRegistroActividad] = useState('')
+  const [versionDatosActividad, setVersionDatosActividad] = useState(0)
 
   /* =========================================================
      INSTALACIÓN PWA
@@ -1439,17 +1442,9 @@ function App() {
 
     if (!regla) return null
 
-    let litros = 0
-
-    if (aplicarSobre === 'volumen_total') {
-      litros =
-        Number(
-          acuarioSeleccionado?.volumen_litros
-        ) || 0
-    } else {
-      litros =
-        Number(litrosPersonalizados) || 0
-    }
+    const litros = aplicarSobre === 'volumen_total'
+      ? Number(acuarioSeleccionado?.volumen_litros) || 0
+      : Number(litrosPersonalizados) || 0
 
     if (!litros) return null
 
@@ -1988,24 +1983,27 @@ function App() {
     )
   }
 
-  const abrirModalProducto = () => {
+  const abrirModalProducto = (producto = null) => {
+    const regla = obtenerReglaPrincipal(producto)
+
     setFormProducto({
-      nombre: '',
-      marca: '',
-      categoria: '',
-      descripcion: '',
-      unidad_dosis: 'ml',
-      fecha_compra: '',
-      fecha_apertura: '',
-      fecha_vencimiento: '',
-      regla_nombre: 'Dosis normal',
-      dosis_cantidad: '',
-      dosis_unidad: 'ml',
-      volumen_referencia_litros: '',
-      aplicar_sobre: 'volumen_total',
-      instrucciones: '',
+      nombre: producto?.nombre ?? '',
+      marca: producto?.marca ?? '',
+      categoria: producto?.categoria ?? '',
+      descripcion: producto?.descripcion ?? '',
+      unidad_dosis: regla?.dosis_unidad ?? producto?.unidad_dosis ?? 'ml',
+      fecha_compra: producto?.fecha_compra ?? '',
+      fecha_apertura: producto?.fecha_apertura ?? '',
+      fecha_vencimiento: producto?.fecha_vencimiento ?? '',
+      regla_nombre: regla?.nombre ?? 'Dosis normal',
+      dosis_cantidad: regla?.dosis_cantidad ?? '',
+      dosis_unidad: regla?.dosis_unidad ?? producto?.unidad_dosis ?? 'ml',
+      volumen_referencia_litros: regla?.volumen_referencia_litros ?? '',
+      aplicar_sobre: regla?.aplicar_sobre ?? 'volumen_total',
+      instrucciones: regla?.instrucciones ?? '',
     })
 
+    setProductoEditando(producto)
     setMostrarModalProducto(true)
   }
 
@@ -2032,13 +2030,7 @@ function App() {
 
     setGuardandoProducto(true)
 
-    const {
-      data: productoCreado,
-      error: errorProducto,
-    } = await supabase
-      .from('productos')
-      .insert([
-        {
+    const datosProducto = {
           usuario_id:
             session.user.id,
           nombre:
@@ -2064,8 +2056,22 @@ function App() {
           fecha_vencimiento:
             formProducto.fecha_vencimiento ||
             null,
-        },
-      ])
+          updated_at: new Date().toISOString(),
+        }
+
+    const consultaProducto = productoEditando
+      ? supabase
+          .from('productos')
+          .update(datosProducto)
+          .eq('id', productoEditando.id)
+      : supabase
+          .from('productos')
+          .insert([datosProducto])
+
+    const {
+      data: productoGuardado,
+      error: errorProducto,
+    } = await consultaProducto
       .select()
       .single()
 
@@ -2077,13 +2083,9 @@ function App() {
       return
     }
 
-    const { error: errorRegla } =
-      await supabase
-        .from('reglas_dosificacion')
-        .insert([
-          {
+    const datosRegla = {
             producto_id:
-              productoCreado.id,
+              productoGuardado.id,
             nombre:
               formProducto.regla_nombre ||
               'Dosis normal',
@@ -2103,8 +2105,20 @@ function App() {
               formProducto.instrucciones.trim() ||
               null,
             activa: true,
-          },
-        ])
+            updated_at: new Date().toISOString(),
+          }
+
+    const reglaExistente = obtenerReglaPrincipal(productoEditando)
+    const consultaRegla = reglaExistente
+      ? supabase
+          .from('reglas_dosificacion')
+          .update(datosRegla)
+          .eq('id', reglaExistente.id)
+      : supabase
+          .from('reglas_dosificacion')
+          .insert([datosRegla])
+
+    const { error: errorRegla } = await consultaRegla
 
     if (errorRegla) {
       setMensaje(
@@ -2117,11 +2131,77 @@ function App() {
     await cargarProductos()
 
     setMostrarModalProducto(false)
+    setProductoEditando(null)
     setGuardandoProducto(false)
 
     setMensaje(
-      '✅ Producto guardado correctamente.'
+      productoEditando
+        ? '✅ Producto actualizado correctamente.'
+        : '✅ Producto guardado correctamente.'
     )
+  }
+
+  const eliminarOArchivarProducto = async (producto) => {
+    if (!producto?.id || eliminandoProductoId) return
+
+    const confirmado = window.confirm(
+      `¿Seguro que quieres eliminar "${producto.nombre}"? ` +
+      'Si tiene historial, se archivará para conservarlo.'
+    )
+    if (!confirmado) return
+
+    setEliminandoProductoId(producto.id)
+
+    try {
+      const [{ count: aplicaciones, error: errorAplicaciones }, { count: asignaciones, error: errorAsignaciones }] =
+        await Promise.all([
+          supabase
+            .from('dosis_aplicadas')
+            .select('id', { count: 'exact', head: true })
+            .eq('producto_id', producto.id),
+          supabase
+            .from('productos_acuario')
+            .select('id', { count: 'exact', head: true })
+            .eq('producto_id', producto.id),
+        ])
+
+      if (errorAplicaciones || errorAsignaciones) {
+        throw errorAplicaciones || errorAsignaciones
+      }
+
+      const tieneHistorial = (aplicaciones ?? 0) > 0 || (asignaciones ?? 0) > 0
+
+      if (tieneHistorial) {
+        const { error } = await supabase
+          .from('productos')
+          .update({ estado: 'archivado', updated_at: new Date().toISOString() })
+          .eq('id', producto.id)
+
+        if (error) throw error
+        setMensaje('✅ El producto tenía historial y fue archivado.')
+      } else {
+        const { error: errorReglas } = await supabase
+          .from('reglas_dosificacion')
+          .delete()
+          .eq('producto_id', producto.id)
+
+        if (errorReglas) throw errorReglas
+
+        const { error } = await supabase
+          .from('productos')
+          .delete()
+          .eq('id', producto.id)
+
+        if (error) throw error
+        setMensaje('✅ Producto eliminado.')
+      }
+
+      await Promise.all([cargarProductos(), cargarProductosAcuario()])
+    } catch (error) {
+      setMensaje(`❌ No se pudo eliminar el producto: ${error.message}`)
+    } finally {
+      setEliminandoProductoId(null)
+    }
   }
 
   const usarProductoEnAcuario = async (
@@ -3145,6 +3225,16 @@ function App() {
     setMostrarRegistroRapido(true)
   }
 
+  const refrescarDatosActividad = async () => {
+    await Promise.all([
+      cargarTareas(),
+      cargarMedicionesAgua(),
+      cargarMantenimientos(),
+      cargarHistorialGeneral(),
+    ])
+    setVersionDatosActividad((version) => version + 1)
+  }
+
   const omitirTarea = async (tarea) => {
     if (!tarea?.id) return
 
@@ -3306,6 +3396,25 @@ function App() {
                     </div>
 
                     <div className="acciones-producto">
+                      <button
+                        className="boton-claro"
+                        onClick={() => abrirModalProducto(producto)}
+                      >
+                        Editar
+                      </button>
+
+                      <button
+                        className="boton-peligro-suave"
+                        disabled={eliminandoProductoId === producto.id}
+                        onClick={() => eliminarOArchivarProducto(producto)}
+                      >
+                        {eliminandoProductoId === producto.id
+                          ? 'Procesando...'
+                          : producto.estado === 'archivado'
+                            ? 'Eliminar'
+                            : 'Eliminar / archivar'}
+                      </button>
+
                       {!productoEstaAsignado(
                         producto.id
                       ) ? (
@@ -3809,6 +3918,7 @@ function App() {
     ) {
       return (
         <GestionAvanzada
+          key={`${acuarioSeleccionado.id}-${seccionActiva}-${versionDatosActividad}`}
           seccion={seccionActiva}
           acuario={acuarioSeleccionado}
           session={session}
@@ -3816,7 +3926,7 @@ function App() {
           onAcuarioActualizado={actualizarAcuarioLocal}
           modoOscuro={modoOscuro}
           onCambiarModo={cambiarModoOscuro}
-          onTareasCambiadas={cargarTareas}
+          onTareasCambiadas={refrescarDatosActividad}
           onAgregarActividad={(fecha) => abrirRegistroRapido(fecha)}
         />
       )
@@ -5188,16 +5298,16 @@ function App() {
             <div className="modal-acuario">
               <div className="modal-cabecera">
                 <h2>
-                  Agregar producto
+                  {productoEditando ? 'Editar producto' : 'Agregar producto'}
                 </h2>
 
                 <button
                   className="boton-cerrar-modal"
-                  onClick={() =>
-                    setMostrarModalProducto(
-                      false
-                    )
-                  }
+                  disabled={guardandoProducto}
+                  onClick={() => {
+                    setMostrarModalProducto(false)
+                    setProductoEditando(null)
+                  }}
                 >
                   ×
                 </button>
@@ -5287,8 +5397,38 @@ function App() {
                   </div>
                 </div>
 
+                <div className="campo-formulario">
+                  <label>Descripción</label>
+                  <textarea
+                    rows="3"
+                    name="descripcion"
+                    value={formProducto.descripcion}
+                    onChange={actualizarCampoProducto}
+                  />
+                </div>
+
+                <div className="fila-formulario">
+                  <div className="campo-formulario">
+                    <label>Compra</label>
+                    <input type="date" name="fecha_compra" value={formProducto.fecha_compra} onChange={actualizarCampoProducto} />
+                  </div>
+                  <div className="campo-formulario">
+                    <label>Apertura</label>
+                    <input type="date" name="fecha_apertura" value={formProducto.fecha_apertura} onChange={actualizarCampoProducto} />
+                  </div>
+                  <div className="campo-formulario">
+                    <label>Vencimiento</label>
+                    <input type="date" name="fecha_vencimiento" value={formProducto.fecha_vencimiento} onChange={actualizarCampoProducto} />
+                  </div>
+                </div>
+
                 <div className="separador-form">
                   Dosificación
+                </div>
+
+                <div className="campo-formulario">
+                  <label>Nombre de la regla</label>
+                  <input name="regla_nombre" value={formProducto.regla_nombre} onChange={actualizarCampoProducto} />
                 </div>
 
                 <div className="fila-dosis">
@@ -5364,6 +5504,15 @@ function App() {
                 </div>
 
                 <div className="campo-formulario">
+                  <label>Aplicar sobre</label>
+                  <select name="aplicar_sobre" value={formProducto.aplicar_sobre} onChange={actualizarCampoProducto}>
+                    <option value="volumen_total">Volumen total</option>
+                    <option value="agua_nueva">Agua nueva</option>
+                    <option value="litros_personalizados">Litros personalizados</option>
+                  </select>
+                </div>
+
+                <div className="campo-formulario">
                   <label>
                     Instrucciones
                   </label>
@@ -5384,11 +5533,11 @@ function App() {
                   <button
                     type="button"
                     className="boton-cancelar"
-                    onClick={() =>
-                      setMostrarModalProducto(
-                        false
-                      )
-                    }
+                    disabled={guardandoProducto}
+                    onClick={() => {
+                      setMostrarModalProducto(false)
+                      setProductoEditando(null)
+                    }}
                   >
                     Cancelar
                   </button>
@@ -5399,7 +5548,11 @@ function App() {
                       guardandoProducto
                     }
                   >
-                    Guardar
+                    {guardandoProducto
+                      ? 'Guardando...'
+                      : productoEditando
+                        ? 'Guardar cambios'
+                        : 'Guardar'}
                   </button>
                 </div>
               </form>
@@ -5585,7 +5738,7 @@ function App() {
             setMostrarRegistroRapido(false)
             setFechaRegistroActividad('')
           }}
-          onGuardado={cargarTareas}
+          onGuardado={refrescarDatosActividad}
           onMensaje={setMensaje}
         />
 

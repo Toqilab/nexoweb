@@ -453,6 +453,7 @@ function Rutinas({ acuario, onMensaje }) {
   const [productos, setProductos] = useState([])
   const [modal, setModal] = useState(false)
   const [guardando, setGuardando] = useState(false)
+  const [rutinaEditando, setRutinaEditando] = useState(null)
   const [form, setForm] = useState({
     titulo: '',
     tipo: 'mantenimiento',
@@ -503,13 +504,17 @@ function Rutinas({ acuario, onMensaje }) {
     e.preventDefault()
     setGuardando(true)
 
-    const { error } = await supabase.from('rutinas_acuario').insert([{
+    const frecuenciaNormalizada = form.frecuencia === 'quincenal'
+      ? 'cada_x_dias'
+      : form.frecuencia
+
+    const datosRutina = {
       acuario_id: acuario.id,
       titulo: form.titulo.trim(),
       tipo: form.tipo,
       descripcion: form.descripcion.trim() || null,
-      frecuencia: form.frecuencia,
-      intervalo: Number(form.intervalo) || 1,
+      frecuencia: frecuenciaNormalizada,
+      intervalo: form.frecuencia === 'quincenal' ? 14 : Number(form.intervalo) || 1,
       dias_semana: form.frecuencia === 'semanal' ? form.dias_semana : null,
       dia_mes: form.frecuencia === 'mensual' ? Number(form.dia_mes) : null,
       hora: form.hora || null,
@@ -520,13 +525,19 @@ function Rutinas({ acuario, onMensaje }) {
       aplicar_sobre: form.tipo === 'producto' ? form.aplicar_sobre : null,
       litros: form.tipo === 'producto' ? numeroONull(form.litros) : null,
       activa: true,
-    }])
+      updated_at: new Date().toISOString(),
+    }
+
+    const { error } = rutinaEditando
+      ? await supabase.from('rutinas_acuario').update(datosRutina).eq('id', rutinaEditando.id)
+      : await supabase.from('rutinas_acuario').insert([datosRutina])
 
     if (error) onMensaje(`Error: ${error.message}`)
     else {
       setModal(false)
+      setRutinaEditando(null)
       await cargar()
-      onMensaje('✅ Rutina creada.')
+      onMensaje(rutinaEditando ? '✅ Rutina actualizada.' : '✅ Rutina creada.')
     }
     setGuardando(false)
   }
@@ -538,14 +549,59 @@ function Rutinas({ acuario, onMensaje }) {
   }
 
   const eliminar = async (rutina) => {
-    if (!window.confirm(`¿Eliminar la rutina "${rutina.titulo}"?`)) return
-    const { error } = await supabase.from('rutinas_acuario').delete().eq('id', rutina.id)
+    if (!window.confirm(`¿Desactivar "${rutina.titulo}" y eliminar solamente sus ocurrencias futuras pendientes?`)) return
+
+    const ahora = new Date().toISOString()
+    const { error: errorTareas } = await supabase
+      .from('tareas_acuario')
+      .delete()
+      .eq('rutina_id', rutina.id)
+      .in('estado', ['pendiente', 'reprogramada'])
+      .gte('fecha_programada', ahora)
+
+    if (errorTareas) {
+      onMensaje(`Error: ${errorTareas.message}`)
+      return
+    }
+
+    const { error } = await supabase
+      .from('rutinas_acuario')
+      .update({ activa: false, updated_at: ahora })
+      .eq('id', rutina.id)
+
     if (error) onMensaje(`Error: ${error.message}`)
-    else cargar()
+    else {
+      await cargar()
+      onMensaje('✅ Rutina desactivada; el historial completado se conservó.')
+    }
+  }
+
+  const editar = (rutina) => {
+    setRutinaEditando(rutina)
+    setForm({
+      titulo: rutina.titulo ?? '',
+      tipo: rutina.tipo ?? 'mantenimiento',
+      descripcion: rutina.descripcion ?? '',
+      frecuencia: rutina.frecuencia === 'cada_x_dias' && Number(rutina.intervalo) === 14
+        ? 'quincenal'
+        : rutina.frecuencia ?? 'semanal',
+      intervalo: String(rutina.intervalo ?? 1),
+      dias_semana: rutina.dias_semana ?? [6],
+      dia_mes: String(rutina.dia_mes ?? 1),
+      hora: rutina.hora?.slice(0, 5) ?? '09:00',
+      fecha_inicio: rutina.fecha_inicio ?? fechaLocal(),
+      fecha_fin: rutina.fecha_fin ?? '',
+      producto_id: rutina.producto_id ?? '',
+      regla_dosificacion_id: rutina.regla_dosificacion_id ?? '',
+      aplicar_sobre: rutina.aplicar_sobre ?? 'volumen_total',
+      litros: rutina.litros ?? '',
+    })
+    setModal(true)
   }
 
   const textoFrecuencia = (r) => {
     if (r.frecuencia === 'diaria') return `Cada ${r.intervalo} día(s)`
+    if (r.frecuencia === 'cada_x_dias' && Number(r.intervalo) === 14) return 'Quincenal'
     if (r.frecuencia === 'cada_x_dias') return `Cada ${r.intervalo} día(s)`
     if (r.frecuencia === 'mensual') return `Día ${r.dia_mes} de cada mes`
     const nombres = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb']
@@ -554,7 +610,7 @@ function Rutinas({ acuario, onMensaje }) {
 
   return (
     <div>
-      <Encabezado titulo="Rutinas" descripcion="Recordatorios recurrentes que continúan después del ciclado." accion="+ Rutina" onAccion={() => setModal(true)} />
+      <Encabezado titulo="Rutinas" descripcion="Recordatorios recurrentes exclusivos de este acuario." accion="+ Rutina" onAccion={() => { setRutinaEditando(null); setModal(true) }} />
 
       {rutinas.length === 0 ? (
         <div className="panel-vacio"><div className="icono-vacio">🔁</div><h3>No hay rutinas</h3><p>Crea alimentación, cambios de agua, fertilización o revisiones recurrentes.</p></div>
@@ -573,8 +629,9 @@ function Rutinas({ acuario, onMensaje }) {
               </div>
               {r.descripcion && <p className="entidad-nota">{r.descripcion}</p>}
               <div className="acciones-entidad">
+                <button className="boton-claro" onClick={() => editar(r)}>Editar</button>
                 <button className="boton-claro" onClick={() => alternar(r)}>{r.activa ? 'Pausar' : 'Activar'}</button>
-                <button className="boton-eliminar-entidad" onClick={() => eliminar(r)}>Eliminar</button>
+                <button className="boton-eliminar-entidad" onClick={() => eliminar(r)}>Eliminar futuras</button>
               </div>
             </article>
           ))}
@@ -582,7 +639,7 @@ function Rutinas({ acuario, onMensaje }) {
       )}
 
       {modal && (
-        <Modal titulo="Nueva rutina" subtitulo="Programa actividades normales del acuario." onCerrar={() => setModal(false)}>
+        <Modal titulo={rutinaEditando ? 'Editar rutina' : 'Nueva rutina'} subtitulo="Programa actividades exclusivas de este acuario." onCerrar={() => { setModal(false); setRutinaEditando(null) }}>
           <form onSubmit={guardar}>
             <div className="campo-formulario"><label>Nombre *</label><input value={form.titulo} onChange={e => setForm({...form,titulo:e.target.value})} placeholder="Ej. Cambio de agua semanal" required /></div>
             <div className="campo-formulario">
@@ -614,6 +671,7 @@ function Rutinas({ acuario, onMensaje }) {
               <select value={form.frecuencia} onChange={e => setForm({...form,frecuencia:e.target.value})}>
                 <option value="diaria">Diaria</option>
                 <option value="semanal">Semanal</option>
+                <option value="quincenal">Quincenal</option>
                 <option value="mensual">Mensual</option>
                 <option value="cada_x_dias">Cada X días</option>
               </select>
@@ -639,7 +697,7 @@ function Rutinas({ acuario, onMensaje }) {
 
             <div className="campo-formulario"><label>Fecha fin (opcional)</label><input type="date" value={form.fecha_fin} onChange={e => setForm({...form,fecha_fin:e.target.value})} /></div>
             <div className="campo-formulario"><label>Descripción</label><textarea rows="3" value={form.descripcion} onChange={e => setForm({...form,descripcion:e.target.value})} /></div>
-            <div className="acciones-modal"><button type="button" className="boton-cancelar" onClick={() => setModal(false)}>Cancelar</button><button className="boton-principal" disabled={guardando}>{guardando ? 'Guardando...' : 'Crear rutina'}</button></div>
+            <div className="acciones-modal"><button type="button" className="boton-cancelar" disabled={guardando} onClick={() => { setModal(false); setRutinaEditando(null) }}>Cancelar</button><button className="boton-principal" disabled={guardando}>{guardando ? 'Guardando...' : rutinaEditando ? 'Guardar cambios' : 'Crear rutina'}</button></div>
           </form>
         </Modal>
       )}
@@ -1752,6 +1810,9 @@ function Calendario({
   )
 }
 
+// Se conserva temporalmente para compatibilidad con instalaciones antiguas;
+// la interfaz activa utiliza CalendarioActividades de ActividadesFinal.jsx.
+void Calendario
 
 function Inventario({ acuario, onMensaje }) {
   const [items, setItems] = useState([])
@@ -1928,7 +1989,7 @@ function Comparar({ session, onMensaje }) {
 
 function Informes({ acuario, onMensaje }) {
   const [resumen, setResumen] = useState(null)
-  const [url, setUrl] = useState(window.location.href)
+  const [url] = useState(window.location.href)
 
   const cargar = async () => {
     const [agua, habitantes, plantas, equipos, productos] = await Promise.all([
