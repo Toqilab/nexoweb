@@ -53,11 +53,42 @@ function Encabezado({ titulo, descripcion, boton, onBoton }) {
   )
 }
 
+const ESPECIES_SUGERIDAS = [
+  'Guppy',
+  'Ramirezi',
+  'Corydora pygmaea',
+  'Corydora panda',
+  'Betta',
+  'Neón tetra',
+  'Cardenal',
+  'Platy',
+  'Molly',
+  'Xipho',
+  'Otocinclus',
+  'Ancistrus',
+  'Escalar',
+  'Goldfish',
+  'Gamba Neocaridina',
+  'Gamba Caridina',
+  'Caracol Neritina',
+]
+
+const iconoHabitante = (tipo = '') => {
+  const valor = tipo.toLowerCase()
+  if (valor.includes('gamba') || valor.includes('camar')) return '🦐'
+  if (valor.includes('caracol')) return '🐌'
+  if (valor.includes('anfibio')) return '🐸'
+  if (valor.includes('tortuga')) return '🐢'
+  return '🐟'
+}
+
 function Habitantes({ acuario, onMensaje }) {
   const [items, setItems] = useState([])
   const [cargando, setCargando] = useState(true)
   const [modal, setModal] = useState(false)
   const [guardando, setGuardando] = useState(false)
+  const [habitanteEliminar, setHabitanteEliminar] = useState(null)
+  const [eliminandoId, setEliminandoId] = useState(null)
   const [form, setForm] = useState({
     nombre_comun: '',
     nombre_cientifico: '',
@@ -116,11 +147,21 @@ function Habitantes({ acuario, onMensaje }) {
     setGuardando(false)
   }
 
-  const eliminar = async (item) => {
-    if (!window.confirm(`¿Eliminar ${item.nombre_comun}?`)) return
+  const eliminar = async () => {
+    const item = habitanteEliminar
+    if (!item?.id || eliminandoId) return
+    setEliminandoId(item.id)
     const { error } = await supabase.from('habitantes').delete().eq('id', item.id)
-    if (error) onMensaje(`Error: ${error.message}`)
-    else cargar()
+    if (error) {
+      onMensaje(`❌ No se pudo eliminar: ${error.message}`)
+      setEliminandoId(null)
+      return
+    }
+
+    await cargar()
+    setHabitanteEliminar(null)
+    setEliminandoId(null)
+    onMensaje(`✅ ${item.nombre_comun} fue eliminado correctamente.`)
   }
 
   return (
@@ -133,7 +174,7 @@ function Habitantes({ acuario, onMensaje }) {
         {items.map((item) => (
           <article className="tarjeta-entidad" key={item.id}>
             <div className="entidad-cabecera">
-              <div className="entidad-icono">🐟</div>
+              <div className="entidad-icono" aria-hidden="true">{iconoHabitante(item.tipo)}</div>
               <div className="entidad-titulo">
                 <h3>{item.nombre_comun}</h3>
                 <p>{item.nombre_cientifico || item.tipo || 'Habitante'}</p>
@@ -145,18 +186,39 @@ function Habitantes({ acuario, onMensaje }) {
               <div><span>Ingreso</span><strong>{fechaBonita(item.fecha_ingreso)}</strong></div>
             </div>
             {item.observaciones && <p className="entidad-nota">{item.observaciones}</p>}
-            <button className="boton-eliminar-entidad" onClick={() => eliminar(item)}>Eliminar</button>
+            <button className="boton-eliminar-entidad" onClick={() => setHabitanteEliminar(item)}>Eliminar</button>
           </article>
         ))}
       </div>}
 
       {modal && (
-        <Modal titulo="Agregar habitante" subtitulo="Registra una especie o grupo." onCerrar={() => setModal(false)}>
+        <Modal titulo="Agregar habitante" subtitulo="Registra la especie, variedad o grupo que vive en este acuario." onCerrar={() => setModal(false)}>
           <form onSubmit={guardar}>
-            <div className="campo-formulario"><label>Nombre común *</label><input value={form.nombre_comun} onChange={(e) => setForm({ ...form, nombre_comun: e.target.value })} required /></div>
-            <div className="campo-formulario"><label>Nombre científico</label><input value={form.nombre_cientifico} onChange={(e) => setForm({ ...form, nombre_cientifico: e.target.value })} /></div>
+            <div className="campo-formulario campo-especie-habitante">
+              <label>Especie o nombre común *</label>
+              <input
+                list="especies-habitantes"
+                value={form.nombre_comun}
+                onChange={(e) => setForm({ ...form, nombre_comun: e.target.value })}
+                placeholder="Ej. Guppy, Ramirezi, Corydora pygmaea..."
+                autoComplete="off"
+                required
+              />
+              <datalist id="especies-habitantes">
+                {ESPECIES_SUGERIDAS.map((especie) => <option value={especie} key={especie} />)}
+              </datalist>
+              <small>Puedes elegir una sugerencia o escribir cualquier otra especie.</small>
+              <div className="sugerencias-especies" aria-label="Especies frecuentes">
+                {ESPECIES_SUGERIDAS.slice(0, 8).map((especie) => (
+                  <button type="button" key={especie} onClick={() => setForm({ ...form, nombre_comun: especie })}>
+                    {especie}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="campo-formulario"><label>Nombre científico <span>(opcional)</span></label><input value={form.nombre_cientifico} onChange={(e) => setForm({ ...form, nombre_cientifico: e.target.value })} placeholder="Ej. Corydoras pygmaeus" /></div>
             <div className="fila-formulario">
-              <div className="campo-formulario"><label>Tipo</label><select value={form.tipo} onChange={(e) => setForm({ ...form, tipo: e.target.value })}><option>Pez</option><option>Camarón</option><option>Caracol</option><option>Otro</option></select></div>
+              <div className="campo-formulario"><label>Grupo</label><select value={form.tipo} onChange={(e) => setForm({ ...form, tipo: e.target.value })}><option>Pez</option><option>Gamba / Camarón</option><option>Caracol</option><option>Anfibio</option><option>Tortuga</option><option>Otro</option></select></div>
               <div className="campo-formulario"><label>Cantidad</label><input type="number" min="1" value={form.cantidad} onChange={(e) => setForm({ ...form, cantidad: e.target.value })} /></div>
             </div>
             <div className="fila-formulario">
@@ -167,6 +229,29 @@ function Habitantes({ acuario, onMensaje }) {
             <div className="acciones-modal"><button type="button" className="boton-cancelar" onClick={() => setModal(false)}>Cancelar</button><button className="boton-principal" disabled={guardando}>{guardando ? 'Guardando...' : 'Guardar'}</button></div>
           </form>
         </Modal>
+      )}
+
+      {habitanteEliminar && (
+        <div className="modal-overlay modal-confirmacion-overlay" onClick={() => !eliminandoId && setHabitanteEliminar(null)}>
+          <div className="modal-confirmacion" onClick={(e) => e.stopPropagation()}>
+            <div className="confirmacion-icono peligro">🗑️</div>
+            <h2>¿Eliminar habitante?</h2>
+            <p>
+              Vas a eliminar <strong>{habitanteEliminar.nombre_comun}</strong> de este acuario.
+            </p>
+            <div className="confirmacion-aviso">
+              Comprueba que seleccionaste el registro correcto antes de continuar.
+            </div>
+            <div className="confirmacion-acciones">
+              <button className="boton-cancelar" disabled={Boolean(eliminandoId)} onClick={() => setHabitanteEliminar(null)}>
+                Cancelar
+              </button>
+              <button className="boton-eliminar-confirmacion" disabled={Boolean(eliminandoId)} onClick={eliminar}>
+                {eliminandoId ? <><span className="spinner-mini" /> Eliminando...</> : 'Sí, eliminar'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

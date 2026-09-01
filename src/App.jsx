@@ -265,6 +265,9 @@ function App() {
   const [mostrarRegistroRapido, setMostrarRegistroRapido] = useState(false)
   const [fechaRegistroActividad, setFechaRegistroActividad] = useState('')
   const [versionDatosActividad, setVersionDatosActividad] = useState(0)
+  const [tareaOmitirPendiente, setTareaOmitirPendiente] = useState(null)
+  const [motivoOmision, setMotivoOmision] = useState('')
+  const [guardandoOmision, setGuardandoOmision] = useState(false)
 
   /* =========================================================
      INSTALACIÓN PWA
@@ -3235,25 +3238,62 @@ function App() {
     setVersionDatosActividad((version) => version + 1)
   }
 
-  const omitirTarea = async (tarea) => {
+  const solicitarOmitirTarea = (tarea) => {
     if (!tarea?.id) return
+    setTareaOmitirPendiente(tarea)
+    setMotivoOmision('')
+  }
+
+  const cancelarOmision = () => {
+    if (guardandoOmision) return
+    setTareaOmitirPendiente(null)
+    setMotivoOmision('')
+  }
+
+  const omitirTarea = async () => {
+    const tarea = tareaOmitirPendiente
+    if (!tarea?.id) return
+
+    setGuardandoOmision(true)
+    const ahora = new Date().toISOString()
 
     const { error } = await supabase
       .from('tareas_acuario')
       .update({
         estado: 'omitida',
-        omitida_en: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
+        omitida_en: ahora,
+        motivo_omision: motivoOmision.trim() || null,
+        updated_at: ahora,
       })
       .eq('id', tarea.id)
 
     if (error) {
       setMensaje(`❌ Error: ${error.message}`)
+      setGuardandoOmision(false)
       return
     }
 
-    await cargarTareas()
-    setMensaje('Actividad marcada como omitida.')
+    const { error: errorHistorial } = await supabase
+      .from('actividad_historial')
+      .insert([{
+        tarea_id: tarea.id,
+        acuario_id: tarea.acuario_id,
+        accion: 'omitida',
+        estado_anterior: tarea.estado || 'pendiente',
+        estado_nuevo: 'omitida',
+        fecha_anterior: tarea.fecha_programada || null,
+        detalle: motivoOmision.trim() || 'Actividad omitida sin motivo.',
+      }])
+
+    if (errorHistorial) {
+      console.warn('No se pudo registrar el historial de omisión:', errorHistorial)
+    }
+
+    await refrescarDatosActividad()
+    setTareaOmitirPendiente(null)
+    setMotivoOmision('')
+    setGuardandoOmision(false)
+    setMensaje('✅ Actividad omitida. El registro se conservó en el historial.')
   }
 
   /* =========================================================
@@ -3546,7 +3586,7 @@ function App() {
 
             <button
               className="boton-omitir-tarea"
-              onClick={() => omitirTarea(tarea)}
+              onClick={() => solicitarOmitirTarea(tarea)}
             >
               Omitir
             </button>
@@ -4086,7 +4126,7 @@ function App() {
           </div>
 
           {mensaje && (
-            <div className="mensaje">
+            <div className="mensaje" role="status" aria-live="polite">
               {mensaje}
             </div>
           )}
@@ -4294,7 +4334,7 @@ function App() {
             </div>
 
             {mensaje && (
-              <div className="mensaje">
+              <div className="mensaje" role="status" aria-live="polite">
                 {mensaje}
               </div>
             )}
@@ -5742,6 +5782,42 @@ function App() {
           onMensaje={setMensaje}
         />
 
+        {tareaOmitirPendiente && (
+          <div className="modal-overlay modal-confirmacion-overlay" onClick={cancelarOmision}>
+            <div className="modal-confirmacion modal-omitir-tarea" onClick={(e) => e.stopPropagation()}>
+              <div className="confirmacion-icono advertencia">⏭️</div>
+              <h2>¿Omitir esta actividad?</h2>
+              <p>
+                <strong>{tareaOmitirPendiente.titulo || 'Actividad'}</strong> no se eliminará.
+                Quedará registrada como omitida en su historial.
+              </p>
+
+              <div className="campo-formulario campo-motivo-omision">
+                <label htmlFor="motivo-omision">Motivo <span>(opcional)</span></label>
+                <textarea
+                  id="motivo-omision"
+                  rows="3"
+                  value={motivoOmision}
+                  onChange={(e) => setMotivoOmision(e.target.value)}
+                  placeholder="Ej. Ya se realizó ayer, hoy no era necesario..."
+                  autoFocus
+                />
+              </div>
+
+              <div className="confirmacion-acciones">
+                <button className="boton-cancelar" disabled={guardandoOmision} onClick={cancelarOmision}>
+                  Volver
+                </button>
+                <button className="boton-omitir-confirmacion" disabled={guardandoOmision} onClick={omitirTarea}>
+                  {guardandoOmision
+                    ? <><span className="spinner-mini" /> Guardando...</>
+                    : 'Sí, omitir'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
 
         {/* =================================================
             MEDICIÓN DE AGUA
@@ -6156,7 +6232,7 @@ function App() {
         </div>
 
         {mensaje && (
-          <div className="mensaje">
+          <div className="mensaje" role="status" aria-live="polite">
             {mensaje}
           </div>
         )}

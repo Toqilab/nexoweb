@@ -1754,6 +1754,167 @@ button {
   }
 }
 
+/* =========================================================
+   LEGIBILIDAD Y AYUDAS DE INTERACCIÓN
+========================================================= */
+
+.app-shell,
+.modal-overlay { font-size: 16px; }
+
+.mensaje {
+  position: relative;
+  z-index: 40;
+  border: 1px solid #b9e6c8;
+  border-left: 5px solid #12a150;
+  border-radius: 12px;
+  background: #ecfdf3;
+  color: #176b3a;
+  box-shadow: 0 8px 24px rgba(18, 161, 80, 0.13);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.45;
+  animation: mensaje-entrada 220ms ease-out;
+}
+
+@keyframes mensaje-entrada {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.campo-formulario label,
+.entidad-datos span,
+.producto-info span,
+.detalle-dia-cabecera > strong,
+.actividad-dia-hora,
+.registro-sheet-cabecera p {
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.campo-formulario label {
+  color: #344054;
+  font-weight: 750;
+}
+
+.campo-formulario label span,
+.campo-formulario small {
+  color: #667085;
+  font-weight: 500;
+}
+
+.entidad-icono,
+.tarea-icono,
+.producto-icono,
+.resumen-icono,
+.registro-icono {
+  min-width: 46px;
+  min-height: 46px;
+  font-size: 24px;
+}
+
+.acciones-entidad button,
+.acciones-producto button,
+.acciones-tarea button,
+.confirmacion-acciones button,
+.campo-formulario input,
+.campo-formulario select { min-height: 44px; }
+
+.sugerencias-especies {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.sugerencias-especies button {
+  min-height: 36px;
+  padding: 7px 11px;
+  border: 1px solid #b9dce7;
+  border-radius: 999px;
+  background: #f0fbff;
+  color: #16677b;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.sugerencias-especies button:hover,
+.sugerencias-especies button:focus-visible {
+  border-color: #1590ad;
+  background: #dff6fc;
+  outline: none;
+}
+
+.modal-omitir-tarea {
+  width: min(92vw, 470px);
+  text-align: left;
+}
+
+.modal-omitir-tarea h2,
+.modal-omitir-tarea > p { text-align: center; }
+
+.confirmacion-icono.advertencia {
+  background: #fff4d6;
+  color: #b54708;
+  font-size: 30px;
+}
+
+.campo-motivo-omision { margin-top: 18px; }
+
+.boton-omitir-confirmacion {
+  border: 0;
+  border-radius: 12px;
+  background: #b54708;
+  color: #fff;
+  padding: 11px 18px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.boton-omitir-confirmacion:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+html.nexoweb-oscuro .campo-formulario label { color: #e5edf4; }
+
+html.nexoweb-oscuro .sugerencias-especies button {
+  border-color: #315f6c;
+  background: #183b45;
+  color: #b9eef9;
+}
+
+@media (max-width: 700px) {
+  .contenido-principal p,
+  .entidad-nota,
+  .tarjeta-tarea p,
+  .modal-acuario p,
+  .modal-confirmacion p {
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  .bottom-nav button {
+    min-height: 56px;
+    font-size: 12px;
+  }
+
+  .bottom-nav span { font-size: 22px; }
+  .bottom-nav .bottom-agregar span { font-size: 29px; }
+
+  .selector-actividades-grid button strong { font-size: 13px; }
+  .selector-actividades-grid button { min-height: 88px; }
+
+  .sugerencias-especies {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 5px;
+    scrollbar-width: thin;
+  }
+
+  .sugerencias-especies button { flex: 0 0 auto; }
+}
+
 @media (max-width: 420px) {
   .grid-parametros-agua,
   .grid-registro-rapido,
