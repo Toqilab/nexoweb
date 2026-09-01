@@ -3305,11 +3305,11 @@ export function CalendarioActividades({
 
   const eventosDia = eventos
     .filter((evento) => evento.fecha === fechaSeleccionada)
-    .sort((a, b) =>
-      String(a.hora || '').localeCompare(
-        String(b.hora || '')
-      )
-    )
+    .sort((a, b) => {
+      const archivadoA = ['omitida', 'eliminada'].includes(a.estado) ? 1 : 0
+      const archivadoB = ['omitida', 'eliminada'].includes(b.estado) ? 1 : 0
+      return archivadoA - archivadoB || String(a.hora || '').localeCompare(String(b.hora || ''))
+    })
 
   const dias = []
   let cursor = new Date(inicioGrilla)
@@ -3749,7 +3749,7 @@ export function CalendarioActividades({
           <div className="lista-actividades-dia">
             {eventosDia.map((evento) => (
               <article
-                className="actividad-dia-card"
+                className={`actividad-dia-card ${['omitida', 'eliminada'].includes(evento.estado) ? 'actividad-dia-card-inactiva' : ''}`}
                 key={`${evento.origen}-${evento.id}`}
               >
                 <div className="actividad-dia-hora">

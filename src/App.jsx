@@ -12,7 +12,7 @@ const SelectorRegistroActividades = lazy(() =>
   import('./ActividadesFinal.jsx').then((modulo) => ({ default: modulo.SelectorRegistroActividades }))
 )
 
-const NEXOWEB_VERSION = '1.7.1'
+const NEXOWEB_VERSION = '1.8.0'
 
 const portadaDefaultAcuario = (tipo = '') => {
   const valor = String(tipo || '').toLowerCase()
@@ -1757,6 +1757,36 @@ function App() {
      TAREAS
   ========================================================= */
 
+  const programarRecordatoriosLocales = (tareas = []) => {
+    if (!('Notification' in window) || Notification.permission !== 'granted') return
+
+    tareas
+      .filter((tarea) => tarea.estado === 'pendiente' && tarea.fecha_programada)
+      .forEach((tarea) => {
+        const anticipacion = Number(tarea.recordatorio_minutos || 0) * 60 * 1000
+        const momento = new Date(tarea.fecha_programada).getTime() - anticipacion
+        const demora = momento - Date.now()
+        if (demora < -60 * 60 * 1000 || demora > 24 * 60 * 60 * 1000) return
+
+        const clave = `nexoweb-aviso-${tarea.id}-${tarea.fecha_programada}`
+        const mostrar = async () => {
+          if (localStorage.getItem(clave)) return
+          localStorage.setItem(clave, new Date().toISOString())
+          const registro = await navigator.serviceWorker?.ready
+          registro?.showNotification?.(`NexoWeb · ${tarea.titulo || 'Actividad pendiente'}`, {
+            body: `Programada para ${new Date(tarea.fecha_programada).toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit' })}.`,
+            icon: '/icons.svg',
+            badge: '/icons.svg',
+            tag: clave,
+            data: { url: '/' },
+          })
+        }
+
+        if (demora <= 0) mostrar()
+        else window.setTimeout(mostrar, demora)
+      })
+  }
+
   const cargarTareas = async () => {
     if (!acuarioSeleccionado?.id) return
 
@@ -1819,7 +1849,9 @@ function App() {
         )
 
     if (!errorHoy) {
-      setTareasHoy(hoy ?? [])
+      const tareasDelDia = hoy ?? []
+      setTareasHoy(tareasDelDia.filter((tarea) => !['omitida', 'eliminada'].includes(tarea.estado)))
+      programarRecordatoriosLocales(tareasDelDia)
     }
 
     if (!errorVencidas) {
@@ -2654,7 +2686,22 @@ function App() {
       cargarHistorialGeneral(),
     ])
 
-    setMensaje('✅ Medición del agua registrada.')
+    const temperaturaMedida = numeroONull(formAgua.temperatura_c)
+    let alertaTemperatura = ''
+    if (temperaturaMedida != null) {
+      const [{ data: habitantesTemperatura }, { data: plantasTemperatura }] = await Promise.all([
+        supabase.from('habitantes').select('nombre_comun,temperatura_min_c,temperatura_max_c').eq('acuario_id', acuarioSeleccionado.id).neq('estado', 'baja'),
+        supabase.from('plantas').select('nombre_comun,temperatura_min_c,temperatura_max_c').eq('acuario_id', acuarioSeleccionado.id).neq('estado', 'baja'),
+      ])
+      const incompatibles = [...(habitantesTemperatura ?? []), ...(plantasTemperatura ?? [])].filter((item) =>
+        (item.temperatura_min_c != null && temperaturaMedida < Number(item.temperatura_min_c)) ||
+        (item.temperatura_max_c != null && temperaturaMedida > Number(item.temperatura_max_c))
+      )
+      if (incompatibles.length) alertaTemperatura = ` ⚠️ Temperatura fuera del rango de: ${incompatibles.slice(0, 3).map((item) => item.nombre_comun).join(', ')}${incompatibles.length > 3 ? ' y más' : ''}.`
+      else if (acuarioSeleccionado.temperatura_objetivo != null && Math.abs(temperaturaMedida - Number(acuarioSeleccionado.temperatura_objetivo)) > 1.5) alertaTemperatura = ` ⚠️ Está alejada del objetivo de ${acuarioSeleccionado.temperatura_objetivo} °C.`
+    }
+
+    setMensaje(`✅ Medición del agua registrada.${alertaTemperatura}`)
     setGuardandoAgua(false)
   }
 

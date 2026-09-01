@@ -98,6 +98,8 @@ function Habitantes({ acuario, onMensaje }) {
     sexo: '',
     fecha_ingreso: hoy(),
     estado: 'activo',
+    temperatura_min_c: '',
+    temperatura_max_c: '',
     observaciones: '',
   })
 
@@ -120,7 +122,7 @@ function Habitantes({ acuario, onMensaje }) {
     setForm({
       nombre_comun: item?.nombre_comun ?? '', nombre_cientifico: item?.nombre_cientifico ?? '', tipo: item?.tipo ?? 'Pez',
       cantidad: String(item?.cantidad ?? 1), sexo: item?.sexo ?? '', fecha_ingreso: item?.fecha_ingreso ?? hoy(),
-      estado: item?.estado ?? 'activo', observaciones: item?.observaciones ?? '',
+      estado: item?.estado ?? 'activo', temperatura_min_c: item?.temperatura_min_c ?? '', temperatura_max_c: item?.temperatura_max_c ?? '', observaciones: item?.observaciones ?? '',
     })
     setModal(true)
   }
@@ -128,6 +130,10 @@ function Habitantes({ acuario, onMensaje }) {
   const guardar = async (e) => {
     e.preventDefault()
     if (!form.nombre_comun.trim()) return
+    if (form.temperatura_min_c !== '' && form.temperatura_max_c !== '' && Number(form.temperatura_min_c) > Number(form.temperatura_max_c)) {
+      onMensaje('La temperatura mínima no puede ser mayor que la máxima.')
+      return
+    }
     setGuardando(true)
     const datos = {
       acuario_id: acuario.id,
@@ -138,6 +144,8 @@ function Habitantes({ acuario, onMensaje }) {
       sexo: form.sexo || null,
       fecha_ingreso: form.fecha_ingreso || null,
       estado: form.estado,
+      temperatura_min_c: form.temperatura_min_c === '' ? null : Number(form.temperatura_min_c),
+      temperatura_max_c: form.temperatura_max_c === '' ? null : Number(form.temperatura_max_c),
       observaciones: form.observaciones.trim() || null,
       updated_at: new Date().toISOString(),
     }
@@ -149,7 +157,9 @@ function Habitantes({ acuario, onMensaje }) {
       setModal(false)
       setHabitanteEditando(null)
       await cargar()
-      onMensaje(habitanteEditando ? '✅ Habitante actualizado.' : '✅ Habitante registrado.')
+      const objetivo = acuario.temperatura_objetivo == null ? null : Number(acuario.temperatura_objetivo)
+      const incompatible = objetivo != null && ((form.temperatura_min_c !== '' && objetivo < Number(form.temperatura_min_c)) || (form.temperatura_max_c !== '' && objetivo > Number(form.temperatura_max_c)))
+      onMensaje(`${habitanteEditando ? '✅ Habitante actualizado.' : '✅ Habitante registrado.'}${incompatible ? ` ⚠️ La temperatura objetivo (${objetivo} °C) está fuera de su rango.` : ''}`)
     }
     setGuardando(false)
   }
@@ -191,6 +201,7 @@ function Habitantes({ acuario, onMensaje }) {
             <div className="entidad-datos">
               <div><span>Cantidad</span><strong>{item.cantidad ?? 1}</strong></div>
               <div><span>Ingreso</span><strong>{fechaBonita(item.fecha_ingreso)}</strong></div>
+              {(item.temperatura_min_c != null || item.temperatura_max_c != null) && <div><span>Temperatura</span><strong>{item.temperatura_min_c ?? '—'}–{item.temperatura_max_c ?? '—'} °C</strong></div>}
             </div>
             {item.observaciones && <p className="entidad-nota">{item.observaciones}</p>}
             <div className="acciones-entidad">
@@ -252,6 +263,11 @@ function Habitantes({ acuario, onMensaje }) {
             <div className="confirmacion-aviso">
               Comprueba que seleccionaste el registro correcto antes de continuar.
             </div>
+            <div className="fila-formulario">
+              <div className="campo-formulario"><label>Temperatura mínima °C <span>(opcional)</span></label><input type="number" step="0.1" inputMode="decimal" value={form.temperatura_min_c} onChange={(e) => setForm({ ...form, temperatura_min_c: e.target.value })} /></div>
+              <div className="campo-formulario"><label>Temperatura máxima °C <span>(opcional)</span></label><input type="number" step="0.1" inputMode="decimal" value={form.temperatura_max_c} onChange={(e) => setForm({ ...form, temperatura_max_c: e.target.value })} /></div>
+            </div>
+            <small className="ayuda-temperatura">Solo se validará cuando definas uno o ambos límites.</small>
             <div className="confirmacion-acciones">
               <button className="boton-cancelar" disabled={Boolean(eliminandoId)} onClick={() => setHabitanteEliminar(null)}>
                 Cancelar
@@ -276,7 +292,7 @@ function Plantas({ acuario, onMensaje }) {
   const [form, setForm] = useState({
     nombre_comun: '', nombre_cientifico: '', cantidad: '1',
     ubicacion: '', requerimiento_luz: '', requerimiento_co2: '',
-    fecha_plantado: hoy(), estado: 'activa', observaciones: '',
+    fecha_plantado: hoy(), estado: 'activa', temperatura_min_c: '', temperatura_max_c: '', observaciones: '',
   })
 
   const cargar = async () => {
@@ -291,12 +307,16 @@ function Plantas({ acuario, onMensaje }) {
 
   const abrir = (item = null) => {
     setPlantaEditando(item)
-    setForm({ nombre_comun: item?.nombre_comun ?? '', nombre_cientifico: item?.nombre_cientifico ?? '', cantidad: String(item?.cantidad ?? 1), ubicacion: item?.ubicacion ?? '', requerimiento_luz: item?.requerimiento_luz ?? '', requerimiento_co2: item?.requerimiento_co2 ?? '', fecha_plantado: item?.fecha_plantado ?? hoy(), estado: item?.estado ?? 'activa', observaciones: item?.observaciones ?? '' })
+    setForm({ nombre_comun: item?.nombre_comun ?? '', nombre_cientifico: item?.nombre_cientifico ?? '', cantidad: String(item?.cantidad ?? 1), ubicacion: item?.ubicacion ?? '', requerimiento_luz: item?.requerimiento_luz ?? '', requerimiento_co2: item?.requerimiento_co2 ?? '', fecha_plantado: item?.fecha_plantado ?? hoy(), estado: item?.estado ?? 'activa', temperatura_min_c: item?.temperatura_min_c ?? '', temperatura_max_c: item?.temperatura_max_c ?? '', observaciones: item?.observaciones ?? '' })
     setModal(true)
   }
 
   const guardar = async (e) => {
     e.preventDefault()
+    if (form.temperatura_min_c !== '' && form.temperatura_max_c !== '' && Number(form.temperatura_min_c) > Number(form.temperatura_max_c)) {
+      onMensaje('La temperatura mínima no puede ser mayor que la máxima.')
+      return
+    }
     setGuardando(true)
     const datos = {
       acuario_id: acuario.id,
@@ -308,6 +328,8 @@ function Plantas({ acuario, onMensaje }) {
       requerimiento_co2: form.requerimiento_co2 || null,
       fecha_plantado: form.fecha_plantado || null,
       estado: form.estado,
+      temperatura_min_c: form.temperatura_min_c === '' ? null : Number(form.temperatura_min_c),
+      temperatura_max_c: form.temperatura_max_c === '' ? null : Number(form.temperatura_max_c),
       observaciones: form.observaciones.trim() || null,
       updated_at: new Date().toISOString(),
     }
@@ -315,7 +337,12 @@ function Plantas({ acuario, onMensaje }) {
       ? await supabase.from('plantas').update(datos).eq('id', plantaEditando.id)
       : await supabase.from('plantas').insert([datos])
     if (error) onMensaje(`❌ Error: ${error.message}`)
-    else { setModal(false); setPlantaEditando(null); await cargar(); onMensaje(plantaEditando ? '✅ Planta actualizada.' : '✅ Planta registrada.') }
+    else {
+      setModal(false); setPlantaEditando(null); await cargar()
+      const objetivo = acuario.temperatura_objetivo == null ? null : Number(acuario.temperatura_objetivo)
+      const incompatible = objetivo != null && ((form.temperatura_min_c !== '' && objetivo < Number(form.temperatura_min_c)) || (form.temperatura_max_c !== '' && objetivo > Number(form.temperatura_max_c)))
+      onMensaje(`${plantaEditando ? '✅ Planta actualizada.' : '✅ Planta registrada.'}${incompatible ? ` ⚠️ La temperatura objetivo (${objetivo} °C) está fuera de su rango.` : ''}`)
+    }
     setGuardando(false)
   }
 
@@ -344,6 +371,7 @@ function Plantas({ acuario, onMensaje }) {
               <div><span>Ubicación</span><strong>{item.ubicacion || '—'}</strong></div>
               <div><span>Luz</span><strong>{item.requerimiento_luz || '—'}</strong></div>
               <div><span>CO₂</span><strong>{item.requerimiento_co2 || '—'}</strong></div>
+              {(item.temperatura_min_c != null || item.temperatura_max_c != null) && <div><span>Temperatura</span><strong>{item.temperatura_min_c ?? '—'}–{item.temperatura_max_c ?? '—'} °C</strong></div>}
             </div>
             {item.observaciones && <p className="entidad-nota">{item.observaciones}</p>}
             <div className="acciones-entidad"><button className="boton-claro" onClick={() => abrir(item)}>Editar</button><button className="boton-eliminar-entidad" onClick={() => eliminar(item)}>Eliminar</button></div>
@@ -359,6 +387,11 @@ function Plantas({ acuario, onMensaje }) {
             <div className="campo-formulario"><label>Cantidad</label><input type="number" min="1" value={form.cantidad} onChange={(e) => setForm({ ...form, cantidad: e.target.value })} /></div>
             <div className="campo-formulario"><label>Ubicación</label><input placeholder="Frontal, medio, fondo..." value={form.ubicacion} onChange={(e) => setForm({ ...form, ubicacion: e.target.value })} /></div>
           </div>
+          <div className="fila-formulario">
+            <div className="campo-formulario"><label>Temperatura mínima °C <span>(opcional)</span></label><input type="number" step="0.1" inputMode="decimal" value={form.temperatura_min_c} onChange={(e) => setForm({ ...form, temperatura_min_c: e.target.value })} /></div>
+            <div className="campo-formulario"><label>Temperatura máxima °C <span>(opcional)</span></label><input type="number" step="0.1" inputMode="decimal" value={form.temperatura_max_c} onChange={(e) => setForm({ ...form, temperatura_max_c: e.target.value })} /></div>
+          </div>
+          <small className="ayuda-temperatura">Si no defines el rango, no afectará ninguna función.</small>
           <div className="fila-formulario">
             <div className="campo-formulario"><label>Luz</label><select value={form.requerimiento_luz} onChange={(e) => setForm({ ...form, requerimiento_luz: e.target.value })}><option value="">Sin definir</option><option>Baja</option><option>Media</option><option>Alta</option></select></div>
             <div className="campo-formulario"><label>CO₂</label><select value={form.requerimiento_co2} onChange={(e) => setForm({ ...form, requerimiento_co2: e.target.value })}><option value="">Sin definir</option><option>No requiere</option><option>Opcional</option><option>Recomendado</option><option>Requiere</option></select></div>

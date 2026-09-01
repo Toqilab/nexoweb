@@ -1,4 +1,4 @@
-const CACHE_NAME = 'nexoweb-v1.7.1'
+const CACHE_NAME = 'nexoweb-v1.8.0'
 const APP_SHELL = ['/', '/index.html', '/manifest.webmanifest', '/icons.svg']
 
 self.addEventListener('install', (event) => {
@@ -48,5 +48,40 @@ self.addEventListener('fetch', (event) => {
 
         return Response.error()
       })
+  )
+})
+
+self.addEventListener('push', (event) => {
+  let aviso
+  try {
+    aviso = event.data?.json() || {}
+  } catch {
+    aviso = { body: event.data?.text() }
+  }
+
+  event.waitUntil(
+    self.registration.showNotification(aviso.title || 'NexoWeb', {
+      body: aviso.body || 'Tienes una actividad pendiente en tu acuario.',
+      icon: '/icons.svg',
+      badge: '/icons.svg',
+      tag: aviso.tag || 'nexoweb-recordatorio',
+      data: { url: aviso.url || '/' },
+    })
+  )
+})
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close()
+  const destino = new URL(event.notification.data?.url || '/', self.location.origin).href
+
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((ventanas) => {
+      const abierta = ventanas.find((ventana) => ventana.url.startsWith(self.location.origin))
+      if (abierta) {
+        abierta.navigate(destino)
+        return abierta.focus()
+      }
+      return self.clients.openWindow(destino)
+    })
   )
 })

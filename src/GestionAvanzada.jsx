@@ -241,6 +241,7 @@ function ConfiguracionAcuario({ acuario, session, onMensaje, onAcuarioActualizad
   const [foto, setFoto] = useState(null)
   const [preview, setPreview] = useState(acuario.foto_portada_url || '')
   const [guardando, setGuardando] = useState(false)
+  const [mostrarOpcionales, setMostrarOpcionales] = useState(false)
 
   useEffect(() => {
     setPreview(acuario.foto_portada_url || '')
@@ -345,22 +346,12 @@ function ConfiguracionAcuario({ acuario, session, onMensaje, onAcuarioActualizad
 
       <div className="config-grid">
         <form className="panel-config" onSubmit={guardar}>
-          <div className="portada-editor">
-            <div className="portada-preview">
-              {preview ? <img src={preview} alt="Portada" /> : <div>🐠</div>}
-            </div>
-            <div>
-              <strong>Foto de portada</strong>
-              <p>NexoWeb la comprime antes de subirla.</p>
-              <input type="file" accept="image/*" onChange={seleccionarFoto} />
-              {foto && <small>{foto.name} · {formatoBytes(foto.size)}</small>}
-            </div>
+          <div className="config-seccion-cabecera">
+            <span>1</span>
+            <div><strong>Información principal</strong><small>Lo necesario para identificar y cuidar tu acuario.</small></div>
           </div>
 
-          <div className="fila-formulario">
-            <div className="campo-formulario"><label>Nombre</label><input value={form.nombre} onChange={e => setForm({...form, nombre:e.target.value})} required /></div>
-            <div className="campo-formulario"><label>Volumen L</label><input type="number" step="0.1" value={form.volumen_litros} onChange={e => setForm({...form, volumen_litros:e.target.value})} /></div>
-          </div>
+          <div className="campo-formulario"><label>Nombre del acuario *</label><input value={form.nombre} onChange={e => setForm({...form, nombre:e.target.value})} required /></div>
 
           <div className="fila-formulario">
             <div className="campo-formulario">
@@ -377,28 +368,40 @@ function ConfiguracionAcuario({ acuario, session, onMensaje, onAcuarioActualizad
                 <option>Otro</option>
               </select>
             </div>
-            <div className="campo-formulario"><label>Subtipo</label><input placeholder="Ej. tropical, low-tech..." value={form.subtipo} onChange={e => setForm({...form, subtipo:e.target.value})} /></div>
+            <div className="campo-formulario"><label>Volumen (litros)</label><input type="number" min="0" step="0.1" inputMode="decimal" value={form.volumen_litros} onChange={e => setForm({...form, volumen_litros:e.target.value})} /></div>
           </div>
 
-          <div className="fila-tres">
-            <div className="campo-formulario"><label>Largo cm</label><input type="number" step="0.1" value={form.largo_cm} onChange={e => setForm({...form, largo_cm:e.target.value})} /></div>
-            <div className="campo-formulario"><label>Ancho cm</label><input type="number" step="0.1" value={form.ancho_cm} onChange={e => setForm({...form, ancho_cm:e.target.value})} /></div>
-            <div className="campo-formulario"><label>Alto cm</label><input type="number" step="0.1" value={form.alto_cm} onChange={e => setForm({...form, alto_cm:e.target.value})} /></div>
+          <div className="campo-formulario config-temperatura">
+            <label>Temperatura objetivo (°C)</label>
+            <input type="number" min="0" step="0.1" inputMode="decimal" value={form.temperatura_objetivo} onChange={e => setForm({...form, temperatura_objetivo:e.target.value})} />
           </div>
 
-          <div className="fila-formulario">
-            <div className="campo-formulario"><label>Ubicación</label><select value={form.ubicacion} onChange={e => setForm({...form, ubicacion:e.target.value})}><option value="">Sin definir</option><option>Interior</option><option>Exterior</option></select></div>
-            <div className="campo-formulario"><label>Exposición solar</label><select value={form.exposicion_solar} onChange={e => setForm({...form, exposicion_solar:e.target.value})}><option value="">Sin definir</option><option>Sin sol directo</option><option>Sol indirecto</option><option>Sol parcial</option><option>Sol directo</option></select></div>
-          </div>
+          <button className="boton-detalles-opcionales" type="button" aria-expanded={mostrarOpcionales} onClick={() => setMostrarOpcionales(!mostrarOpcionales)}>
+            <span>⚙️</span>
+            <span><strong>Detalles opcionales</strong><small>Foto, medidas, ubicación, costo y descripción</small></span>
+            <span>{mostrarOpcionales ? '⌃' : '⌄'}</span>
+          </button>
 
-          <div className="fila-formulario">
-            <div className="campo-formulario"><label>Temperatura objetivo °C</label><input type="number" step="0.1" value={form.temperatura_objetivo} onChange={e => setForm({...form, temperatura_objetivo:e.target.value})} /></div>
-            <div className="campo-formulario"><label>Costo inicial</label><input type="number" step="0.01" value={form.costo_inicial} onChange={e => setForm({...form, costo_inicial:e.target.value})} /></div>
-          </div>
+          {mostrarOpcionales && <div className="detalles-opcionales config-opcionales">
+            <div className="portada-editor">
+              <div className="portada-preview">{preview ? <img src={preview} alt="Portada" /> : <div>🐠</div>}</div>
+              <div><strong>Foto de portada</strong><p>NexoWeb la comprime antes de subirla.</p><input type="file" accept="image/*" onChange={seleccionarFoto} />{foto && <small>{foto.name} · {formatoBytes(foto.size)}</small>}</div>
+            </div>
+            <div className="campo-formulario"><label>Subtipo <small>(opcional)</small></label><input placeholder="Ej. tropical, low-tech..." value={form.subtipo} onChange={e => setForm({...form, subtipo:e.target.value})} /></div>
+            <div className="fila-tres">
+              <div className="campo-formulario"><label>Largo (cm)</label><input type="number" min="0" step="0.1" inputMode="decimal" value={form.largo_cm} onChange={e => setForm({...form, largo_cm:e.target.value})} /></div>
+              <div className="campo-formulario"><label>Ancho (cm)</label><input type="number" min="0" step="0.1" inputMode="decimal" value={form.ancho_cm} onChange={e => setForm({...form, ancho_cm:e.target.value})} /></div>
+              <div className="campo-formulario"><label>Alto (cm)</label><input type="number" min="0" step="0.1" inputMode="decimal" value={form.alto_cm} onChange={e => setForm({...form, alto_cm:e.target.value})} /></div>
+            </div>
+            <div className="fila-formulario">
+              <div className="campo-formulario"><label>Ubicación</label><select value={form.ubicacion} onChange={e => setForm({...form, ubicacion:e.target.value})}><option value="">Sin definir</option><option>Interior</option><option>Exterior</option></select></div>
+              <div className="campo-formulario"><label>Exposición solar</label><select value={form.exposicion_solar} onChange={e => setForm({...form, exposicion_solar:e.target.value})}><option value="">Sin definir</option><option>Sin sol directo</option><option>Sol indirecto</option><option>Sol parcial</option><option>Sol directo</option></select></div>
+            </div>
+            <div className="campo-formulario"><label>Costo inicial <small>(opcional)</small></label><input type="number" min="0" step="0.01" inputMode="decimal" value={form.costo_inicial} onChange={e => setForm({...form, costo_inicial:e.target.value})} /></div>
+            <div className="campo-formulario"><label>Descripción <small>(opcional)</small></label><textarea rows="4" value={form.descripcion} onChange={e => setForm({...form, descripcion:e.target.value})} /></div>
+          </div>}
 
-          <div className="campo-formulario"><label>Descripción</label><textarea rows="4" value={form.descripcion} onChange={e => setForm({...form, descripcion:e.target.value})} /></div>
-
-          <button className="boton-principal" disabled={guardando}>{guardando ? 'Guardando...' : 'Guardar cambios'}</button>
+          <div className="config-guardar"><button className="boton-principal" disabled={guardando}>{guardando ? 'Guardando cambios…' : 'Guardar cambios'}</button></div>
         </form>
 
         <aside className="panel-config panel-config-lateral">
@@ -409,7 +412,7 @@ function ConfiguracionAcuario({ acuario, session, onMensaje, onAcuarioActualizad
           </div>
 
           <h3>Notificaciones</h3>
-          <p>NexoWeb puede pedir permiso para mostrar avisos mientras el navegador/PWA está disponible.</p>
+          <p>Activa los avisos de las actividades que tienen fecha. Con NexoWeb abierto recibirás sus recordatorios; el envío con la aplicación totalmente cerrada requiere Web Push.</p>
           <button
             className="boton-claro boton-ancho"
             type="button"
@@ -425,8 +428,9 @@ function ConfiguracionAcuario({ acuario, session, onMensaje, onAcuarioActualizad
                 const registro = await navigator.serviceWorker?.ready
                 registro?.showNotification?.('NexoWeb', {
                   body: '✅ Notificaciones activadas.',
-                  icon: '/nexoweb-icon.svg',
-                  badge: '/nexoweb-icon.svg',
+                  icon: '/icons.svg',
+                  badge: '/icons.svg',
+                  data: { url: '/' },
                 })
                 onMensaje('✅ Permiso de notificaciones activado.')
               } else {

@@ -16,6 +16,14 @@ alter table if exists public.productos
 alter table if exists public.reglas_dosificacion
   add column if not exists updated_at timestamptz default now();
 
+alter table if exists public.habitantes
+  add column if not exists temperatura_min_c numeric,
+  add column if not exists temperatura_max_c numeric;
+
+alter table if exists public.plantas
+  add column if not exists temperatura_min_c numeric,
+  add column if not exists temperatura_max_c numeric;
+
 create unique index if not exists tareas_acuario_rutina_fecha_unica
   on public.tareas_acuario (rutina_id, fecha_rutina)
   where rutina_id is not null and fecha_rutina is not null;
