@@ -1928,7 +1928,16 @@ html.nexoweb-oscuro .sugerencias-especies button {
     scrollbar-width: thin;
   }
 
-  .sugerencias-especies button { flex: 0 0 auto; }
+.sugerencias-especies button { flex: 0 0 auto; }
+}
+
+.foto-edicion-preview {
+  display: block;
+  width: 100%;
+  max-height: 260px;
+  margin-bottom: 16px;
+  border-radius: 14px;
+  object-fit: cover;
 }
 
 @media (max-width: 420px) {

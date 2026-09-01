@@ -1,4 +1,4 @@
-const CACHE_NAME = 'nexoweb-v1.7.0'
+const CACHE_NAME = 'nexoweb-v1.7.1'
 const APP_SHELL = ['/', '/index.html', '/manifest.webmanifest', '/icons.svg']
 
 self.addEventListener('install', (event) => {

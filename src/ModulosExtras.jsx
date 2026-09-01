@@ -87,6 +87,7 @@ function Habitantes({ acuario, onMensaje }) {
   const [cargando, setCargando] = useState(true)
   const [modal, setModal] = useState(false)
   const [guardando, setGuardando] = useState(false)
+  const [habitanteEditando, setHabitanteEditando] = useState(null)
   const [habitanteEliminar, setHabitanteEliminar] = useState(null)
   const [eliminandoId, setEliminandoId] = useState(null)
   const [form, setForm] = useState({
@@ -114,11 +115,12 @@ function Habitantes({ acuario, onMensaje }) {
 
   useEffect(() => { cargar() }, [acuario.id])
 
-  const abrir = () => {
+  const abrir = (item = null) => {
+    setHabitanteEditando(item)
     setForm({
-      nombre_comun: '', nombre_cientifico: '', tipo: 'Pez',
-      cantidad: '1', sexo: '', fecha_ingreso: hoy(),
-      estado: 'activo', observaciones: '',
+      nombre_comun: item?.nombre_comun ?? '', nombre_cientifico: item?.nombre_cientifico ?? '', tipo: item?.tipo ?? 'Pez',
+      cantidad: String(item?.cantidad ?? 1), sexo: item?.sexo ?? '', fecha_ingreso: item?.fecha_ingreso ?? hoy(),
+      estado: item?.estado ?? 'activo', observaciones: item?.observaciones ?? '',
     })
     setModal(true)
   }
@@ -127,7 +129,7 @@ function Habitantes({ acuario, onMensaje }) {
     e.preventDefault()
     if (!form.nombre_comun.trim()) return
     setGuardando(true)
-    const { error } = await supabase.from('habitantes').insert([{
+    const datos = {
       acuario_id: acuario.id,
       nombre_comun: form.nombre_comun.trim(),
       nombre_cientifico: form.nombre_cientifico.trim() || null,
@@ -137,12 +139,17 @@ function Habitantes({ acuario, onMensaje }) {
       fecha_ingreso: form.fecha_ingreso || null,
       estado: form.estado,
       observaciones: form.observaciones.trim() || null,
-    }])
-    if (error) onMensaje(`Error: ${error.message}`)
+      updated_at: new Date().toISOString(),
+    }
+    const { error } = habitanteEditando
+      ? await supabase.from('habitantes').update(datos).eq('id', habitanteEditando.id)
+      : await supabase.from('habitantes').insert([datos])
+    if (error) onMensaje(`❌ Error: ${error.message}`)
     else {
       setModal(false)
+      setHabitanteEditando(null)
       await cargar()
-      onMensaje('✅ Habitante registrado.')
+      onMensaje(habitanteEditando ? '✅ Habitante actualizado.' : '✅ Habitante registrado.')
     }
     setGuardando(false)
   }
@@ -186,13 +193,16 @@ function Habitantes({ acuario, onMensaje }) {
               <div><span>Ingreso</span><strong>{fechaBonita(item.fecha_ingreso)}</strong></div>
             </div>
             {item.observaciones && <p className="entidad-nota">{item.observaciones}</p>}
-            <button className="boton-eliminar-entidad" onClick={() => setHabitanteEliminar(item)}>Eliminar</button>
+            <div className="acciones-entidad">
+              <button className="boton-claro" onClick={() => abrir(item)}>Editar</button>
+              <button className="boton-eliminar-entidad" onClick={() => setHabitanteEliminar(item)}>Eliminar</button>
+            </div>
           </article>
         ))}
       </div>}
 
       {modal && (
-        <Modal titulo="Agregar habitante" subtitulo="Registra la especie, variedad o grupo que vive en este acuario." onCerrar={() => setModal(false)}>
+        <Modal titulo={habitanteEditando ? 'Editar habitante' : 'Agregar habitante'} subtitulo="Registra la especie, variedad o grupo que vive en este acuario." onCerrar={() => { if (!guardando) { setModal(false); setHabitanteEditando(null) } }}>
           <form onSubmit={guardar}>
             <div className="campo-formulario campo-especie-habitante">
               <label>Especie o nombre común *</label>
@@ -226,7 +236,7 @@ function Habitantes({ acuario, onMensaje }) {
               <div className="campo-formulario"><label>Fecha ingreso</label><input type="date" value={form.fecha_ingreso} onChange={(e) => setForm({ ...form, fecha_ingreso: e.target.value })} /></div>
             </div>
             <div className="campo-formulario"><label>Observaciones</label><textarea rows="3" value={form.observaciones} onChange={(e) => setForm({ ...form, observaciones: e.target.value })} /></div>
-            <div className="acciones-modal"><button type="button" className="boton-cancelar" onClick={() => setModal(false)}>Cancelar</button><button className="boton-principal" disabled={guardando}>{guardando ? 'Guardando...' : 'Guardar'}</button></div>
+            <div className="acciones-modal"><button type="button" className="boton-cancelar" disabled={guardando} onClick={() => { setModal(false); setHabitanteEditando(null) }}>Cancelar</button><button className="boton-principal" disabled={guardando}>{guardando ? <><span className="spinner-mini" /> Guardando...</> : habitanteEditando ? 'Guardar cambios' : 'Guardar'}</button></div>
           </form>
         </Modal>
       )}
@@ -262,6 +272,7 @@ function Plantas({ acuario, onMensaje }) {
   const [cargando, setCargando] = useState(true)
   const [modal, setModal] = useState(false)
   const [guardando, setGuardando] = useState(false)
+  const [plantaEditando, setPlantaEditando] = useState(null)
   const [form, setForm] = useState({
     nombre_comun: '', nombre_cientifico: '', cantidad: '1',
     ubicacion: '', requerimiento_luz: '', requerimiento_co2: '',
@@ -278,15 +289,16 @@ function Plantas({ acuario, onMensaje }) {
 
   useEffect(() => { cargar() }, [acuario.id])
 
-  const abrir = () => {
-    setForm({ nombre_comun: '', nombre_cientifico: '', cantidad: '1', ubicacion: '', requerimiento_luz: '', requerimiento_co2: '', fecha_plantado: hoy(), estado: 'activa', observaciones: '' })
+  const abrir = (item = null) => {
+    setPlantaEditando(item)
+    setForm({ nombre_comun: item?.nombre_comun ?? '', nombre_cientifico: item?.nombre_cientifico ?? '', cantidad: String(item?.cantidad ?? 1), ubicacion: item?.ubicacion ?? '', requerimiento_luz: item?.requerimiento_luz ?? '', requerimiento_co2: item?.requerimiento_co2 ?? '', fecha_plantado: item?.fecha_plantado ?? hoy(), estado: item?.estado ?? 'activa', observaciones: item?.observaciones ?? '' })
     setModal(true)
   }
 
   const guardar = async (e) => {
     e.preventDefault()
     setGuardando(true)
-    const { error } = await supabase.from('plantas').insert([{
+    const datos = {
       acuario_id: acuario.id,
       nombre_comun: form.nombre_comun.trim(),
       nombre_cientifico: form.nombre_cientifico.trim() || null,
@@ -297,9 +309,13 @@ function Plantas({ acuario, onMensaje }) {
       fecha_plantado: form.fecha_plantado || null,
       estado: form.estado,
       observaciones: form.observaciones.trim() || null,
-    }])
-    if (error) onMensaje(`Error: ${error.message}`)
-    else { setModal(false); await cargar(); onMensaje('✅ Planta registrada.') }
+      updated_at: new Date().toISOString(),
+    }
+    const { error } = plantaEditando
+      ? await supabase.from('plantas').update(datos).eq('id', plantaEditando.id)
+      : await supabase.from('plantas').insert([datos])
+    if (error) onMensaje(`❌ Error: ${error.message}`)
+    else { setModal(false); setPlantaEditando(null); await cargar(); onMensaje(plantaEditando ? '✅ Planta actualizada.' : '✅ Planta registrada.') }
     setGuardando(false)
   }
 
@@ -330,12 +346,12 @@ function Plantas({ acuario, onMensaje }) {
               <div><span>CO₂</span><strong>{item.requerimiento_co2 || '—'}</strong></div>
             </div>
             {item.observaciones && <p className="entidad-nota">{item.observaciones}</p>}
-            <button className="boton-eliminar-entidad" onClick={() => eliminar(item)}>Eliminar</button>
+            <div className="acciones-entidad"><button className="boton-claro" onClick={() => abrir(item)}>Editar</button><button className="boton-eliminar-entidad" onClick={() => eliminar(item)}>Eliminar</button></div>
           </article>
         ))}
       </div>}
 
-      {modal && <Modal titulo="Agregar planta" subtitulo="Registra una planta del acuario." onCerrar={() => setModal(false)}>
+      {modal && <Modal titulo={plantaEditando ? 'Editar planta' : 'Agregar planta'} subtitulo="Registra una planta del acuario." onCerrar={() => { if (!guardando) { setModal(false); setPlantaEditando(null) } }}>
         <form onSubmit={guardar}>
           <div className="campo-formulario"><label>Nombre común *</label><input value={form.nombre_comun} onChange={(e) => setForm({ ...form, nombre_comun: e.target.value })} required /></div>
           <div className="campo-formulario"><label>Nombre científico</label><input value={form.nombre_cientifico} onChange={(e) => setForm({ ...form, nombre_cientifico: e.target.value })} /></div>
@@ -349,7 +365,7 @@ function Plantas({ acuario, onMensaje }) {
           </div>
           <div className="campo-formulario"><label>Fecha de plantado</label><input type="date" value={form.fecha_plantado} onChange={(e) => setForm({ ...form, fecha_plantado: e.target.value })} /></div>
           <div className="campo-formulario"><label>Observaciones</label><textarea rows="3" value={form.observaciones} onChange={(e) => setForm({ ...form, observaciones: e.target.value })} /></div>
-          <div className="acciones-modal"><button type="button" className="boton-cancelar" onClick={() => setModal(false)}>Cancelar</button><button className="boton-principal" disabled={guardando}>{guardando ? 'Guardando...' : 'Guardar'}</button></div>
+          <div className="acciones-modal"><button type="button" className="boton-cancelar" disabled={guardando} onClick={() => { setModal(false); setPlantaEditando(null) }}>Cancelar</button><button className="boton-principal" disabled={guardando}>{guardando ? <><span className="spinner-mini" /> Guardando...</> : plantaEditando ? 'Guardar cambios' : 'Guardar'}</button></div>
         </form>
       </Modal>}
     </div>
@@ -424,6 +440,7 @@ function Equipos({ acuario, onMensaje }) {
   const [cargando, setCargando] = useState(true)
   const [modal, setModal] = useState(false)
   const [guardando, setGuardando] = useState(false)
+  const [equipoEditando, setEquipoEditando] = useState(null)
   const [form, setForm] = useState({ nombre: '', tipo: '', marca: '', modelo: '', potencia_w: '', fecha_instalacion: hoy(), observaciones: '' })
 
   const cargar = async () => {
@@ -436,10 +453,20 @@ function Equipos({ acuario, onMensaje }) {
 
   useEffect(() => { cargar() }, [acuario.id])
 
+  const abrir = (item = null) => {
+    setEquipoEditando(item)
+    setForm({
+      nombre: item?.nombre ?? '', tipo: item?.tipo ?? '', marca: item?.marca ?? '',
+      modelo: item?.modelo ?? '', potencia_w: item?.potencia_w ?? '',
+      fecha_instalacion: item?.fecha_instalacion ?? hoy(), observaciones: item?.observaciones ?? '',
+    })
+    setModal(true)
+  }
+
   const guardar = async (e) => {
     e.preventDefault()
     setGuardando(true)
-    const { error } = await supabase.from('equipos').insert([{
+    const datos = {
       acuario_id: acuario.id,
       nombre: form.nombre.trim(),
       tipo: form.tipo || null,
@@ -447,11 +474,15 @@ function Equipos({ acuario, onMensaje }) {
       modelo: form.modelo.trim() || null,
       potencia_w: numeroONull(form.potencia_w),
       fecha_instalacion: form.fecha_instalacion || null,
-      estado: 'activo',
+      estado: equipoEditando?.estado ?? 'activo',
       observaciones: form.observaciones.trim() || null,
-    }])
-    if (error) onMensaje(`Error: ${error.message}`)
-    else { setModal(false); await cargar(); onMensaje('✅ Equipo registrado.') }
+      updated_at: new Date().toISOString(),
+    }
+    const { error } = equipoEditando
+      ? await supabase.from('equipos').update(datos).eq('id', equipoEditando.id)
+      : await supabase.from('equipos').insert([datos])
+    if (error) onMensaje(`❌ Error: ${error.message}`)
+    else { setModal(false); setEquipoEditando(null); await cargar(); onMensaje(equipoEditando ? '✅ Equipo actualizado.' : '✅ Equipo registrado.') }
     setGuardando(false)
   }
 
@@ -470,7 +501,7 @@ function Equipos({ acuario, onMensaje }) {
 
   return (
     <div>
-      <Encabezado titulo="Equipos" descripcion="Filtro, bomba, calentador, aireador, CO₂ y otros." boton="+ Equipo" onBoton={() => setModal(true)} />
+      <Encabezado titulo="Equipos" descripcion="Filtro, bomba, calentador, aireador, CO₂ y otros." boton="+ Equipo" onBoton={() => abrir()} />
       {cargando ? <div className="sin-datos-panel">Cargando...</div> :
        items.length === 0 ? <div className="panel-vacio"><div className="icono-vacio">⚙️</div><h3>No hay equipos registrados</h3></div> :
        <div className="grid-entidades">
@@ -487,19 +518,19 @@ function Equipos({ acuario, onMensaje }) {
               <div><span>Potencia</span><strong>{item.potencia_w ? `${item.potencia_w} W` : '—'}</strong></div>
               <div><span>Instalación</span><strong>{fechaBonita(item.fecha_instalacion)}</strong></div>
             </div>
-            <div className="acciones-entidad"><button className="boton-claro" onClick={() => estado(item)}>{item.estado === 'activo' ? 'Desactivar' : 'Activar'}</button><button className="boton-eliminar-entidad" onClick={() => eliminar(item)}>Eliminar</button></div>
+            <div className="acciones-entidad"><button className="boton-claro" onClick={() => abrir(item)}>Editar</button><button className="boton-claro" onClick={() => estado(item)}>{item.estado === 'activo' ? 'Desactivar' : 'Activar'}</button><button className="boton-eliminar-entidad" onClick={() => eliminar(item)}>Eliminar</button></div>
           </article>
         ))}
       </div>}
 
-      {modal && <Modal titulo="Agregar equipo" subtitulo="Registra el equipamiento del acuario." onCerrar={() => setModal(false)}>
+      {modal && <Modal titulo={equipoEditando ? 'Editar equipo' : 'Agregar equipo'} subtitulo="Registra el equipamiento del acuario." onCerrar={() => { if (!guardando) { setModal(false); setEquipoEditando(null) } }}>
         <form onSubmit={guardar}>
           <div className="campo-formulario"><label>Nombre *</label><input placeholder="Filtro principal" value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} required /></div>
           <div className="fila-formulario"><div className="campo-formulario"><label>Tipo</label><select value={form.tipo} onChange={(e) => setForm({ ...form, tipo: e.target.value })}><option value="">Seleccionar</option><option>Filtro</option><option>Bomba</option><option>Calentador</option><option>Aireador</option><option>CO2</option><option>Otro</option></select></div><div className="campo-formulario"><label>Potencia W</label><input type="number" step="0.1" value={form.potencia_w} onChange={(e) => setForm({ ...form, potencia_w: e.target.value })} /></div></div>
           <div className="fila-formulario"><div className="campo-formulario"><label>Marca</label><input value={form.marca} onChange={(e) => setForm({ ...form, marca: e.target.value })} /></div><div className="campo-formulario"><label>Modelo</label><input value={form.modelo} onChange={(e) => setForm({ ...form, modelo: e.target.value })} /></div></div>
           <div className="campo-formulario"><label>Fecha instalación</label><input type="date" value={form.fecha_instalacion} onChange={(e) => setForm({ ...form, fecha_instalacion: e.target.value })} /></div>
           <div className="campo-formulario"><label>Observaciones</label><textarea rows="3" value={form.observaciones} onChange={(e) => setForm({ ...form, observaciones: e.target.value })} /></div>
-          <div className="acciones-modal"><button type="button" className="boton-cancelar" onClick={() => setModal(false)}>Cancelar</button><button className="boton-principal" disabled={guardando}>{guardando ? 'Guardando...' : 'Guardar'}</button></div>
+          <div className="acciones-modal"><button type="button" className="boton-cancelar" disabled={guardando} onClick={() => { setModal(false); setEquipoEditando(null) }}>Cancelar</button><button className="boton-principal" disabled={guardando}>{guardando ? <><span className="spinner-mini" /> Guardando...</> : equipoEditando ? 'Guardar cambios' : 'Guardar'}</button></div>
         </form>
       </Modal>}
     </div>
@@ -511,6 +542,7 @@ function Iluminacion({ acuario, onMensaje }) {
   const [cargando, setCargando] = useState(true)
   const [modal, setModal] = useState(false)
   const [guardando, setGuardando] = useState(false)
+  const [iluminacionEditando, setIluminacionEditando] = useState(null)
   const [form, setForm] = useState({ nombre: 'Luz principal', hora_encendido: '', hora_apagado: '', intensidad_porcentaje: '', color_luz: '', activa: true, observaciones: '' })
 
   const cargar = async () => {
@@ -523,10 +555,20 @@ function Iluminacion({ acuario, onMensaje }) {
 
   useEffect(() => { cargar() }, [acuario.id])
 
+  const abrir = (item = null) => {
+    setIluminacionEditando(item)
+    setForm({
+      nombre: item?.nombre ?? 'Luz principal', hora_encendido: item?.hora_encendido?.slice(0, 5) ?? '',
+      hora_apagado: item?.hora_apagado?.slice(0, 5) ?? '', intensidad_porcentaje: item?.intensidad_porcentaje ?? '',
+      color_luz: item?.color_luz ?? '', activa: item?.activa ?? true, observaciones: item?.observaciones ?? '',
+    })
+    setModal(true)
+  }
+
   const guardar = async (e) => {
     e.preventDefault()
     setGuardando(true)
-    const { error } = await supabase.from('iluminacion').insert([{
+    const datos = {
       acuario_id: acuario.id,
       nombre: form.nombre.trim() || 'Luz principal',
       hora_encendido: form.hora_encendido || null,
@@ -535,9 +577,13 @@ function Iluminacion({ acuario, onMensaje }) {
       color_luz: form.color_luz.trim() || null,
       activa: form.activa,
       observaciones: form.observaciones.trim() || null,
-    }])
-    if (error) onMensaje(`Error: ${error.message}`)
-    else { setModal(false); await cargar(); onMensaje('✅ Iluminación registrada.') }
+      updated_at: new Date().toISOString(),
+    }
+    const { error } = iluminacionEditando
+      ? await supabase.from('iluminacion').update(datos).eq('id', iluminacionEditando.id)
+      : await supabase.from('iluminacion').insert([datos])
+    if (error) onMensaje(`❌ Error: ${error.message}`)
+    else { setModal(false); setIluminacionEditando(null); await cargar(); onMensaje(iluminacionEditando ? '✅ Iluminación actualizada.' : '✅ Iluminación registrada.') }
     setGuardando(false)
   }
 
@@ -556,7 +602,7 @@ function Iluminacion({ acuario, onMensaje }) {
 
   return (
     <div>
-      <Encabezado titulo="Iluminación" descripcion="Horarios, intensidad y modo de luz." boton="+ Horario" onBoton={() => setModal(true)} />
+      <Encabezado titulo="Iluminación" descripcion="Horarios, intensidad y modo de luz." boton="+ Horario" onBoton={() => abrir()} />
       {cargando ? <div className="sin-datos-panel">Cargando...</div> :
        items.length === 0 ? <div className="panel-vacio"><div className="icono-vacio">💡</div><h3>No hay horarios registrados</h3></div> :
        <div className="grid-entidades">
@@ -573,19 +619,19 @@ function Iluminacion({ acuario, onMensaje }) {
               <div><span>Intensidad</span><strong>{item.intensidad_porcentaje != null ? `${item.intensidad_porcentaje}%` : '—'}</strong></div>
               <div><span>Color</span><strong>{item.color_luz || '—'}</strong></div>
             </div>
-            <div className="acciones-entidad"><button className="boton-claro" onClick={() => alternar(item)}>{item.activa ? 'Desactivar' : 'Activar'}</button><button className="boton-eliminar-entidad" onClick={() => eliminar(item)}>Eliminar</button></div>
+            <div className="acciones-entidad"><button className="boton-claro" onClick={() => abrir(item)}>Editar</button><button className="boton-claro" onClick={() => alternar(item)}>{item.activa ? 'Desactivar' : 'Activar'}</button><button className="boton-eliminar-entidad" onClick={() => eliminar(item)}>Eliminar</button></div>
           </article>
         ))}
       </div>}
 
-      {modal && <Modal titulo="Agregar iluminación" subtitulo="Configura un horario de luz." onCerrar={() => setModal(false)}>
+      {modal && <Modal titulo={iluminacionEditando ? 'Editar iluminación' : 'Agregar iluminación'} subtitulo="Configura un horario de luz." onCerrar={() => { if (!guardando) { setModal(false); setIluminacionEditando(null) } }}>
         <form onSubmit={guardar}>
           <div className="campo-formulario"><label>Nombre</label><input value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} /></div>
           <div className="fila-formulario"><div className="campo-formulario"><label>Encendido</label><input type="time" value={form.hora_encendido} onChange={(e) => setForm({ ...form, hora_encendido: e.target.value })} /></div><div className="campo-formulario"><label>Apagado</label><input type="time" value={form.hora_apagado} onChange={(e) => setForm({ ...form, hora_apagado: e.target.value })} /></div></div>
           <div className="fila-formulario"><div className="campo-formulario"><label>Intensidad %</label><input type="number" min="0" max="100" value={form.intensidad_porcentaje} onChange={(e) => setForm({ ...form, intensidad_porcentaje: e.target.value })} /></div><div className="campo-formulario"><label>Color / modo</label><input value={form.color_luz} onChange={(e) => setForm({ ...form, color_luz: e.target.value })} /></div></div>
           <label className="check-simple"><input type="checkbox" checked={form.activa} onChange={(e) => setForm({ ...form, activa: e.target.checked })} /> Horario activo</label>
           <div className="campo-formulario"><label>Observaciones</label><textarea rows="3" value={form.observaciones} onChange={(e) => setForm({ ...form, observaciones: e.target.value })} /></div>
-          <div className="acciones-modal"><button type="button" className="boton-cancelar" onClick={() => setModal(false)}>Cancelar</button><button className="boton-principal" disabled={guardando}>{guardando ? 'Guardando...' : 'Guardar'}</button></div>
+          <div className="acciones-modal"><button type="button" className="boton-cancelar" disabled={guardando} onClick={() => { setModal(false); setIluminacionEditando(null) }}>Cancelar</button><button className="boton-principal" disabled={guardando}>{guardando ? <><span className="spinner-mini" /> Guardando...</> : iluminacionEditando ? 'Guardar cambios' : 'Guardar'}</button></div>
         </form>
       </Modal>}
     </div>
@@ -597,6 +643,7 @@ function Notas({ acuario, onMensaje, onHistorialCambiado }) {
   const [cargando, setCargando] = useState(true)
   const [modal, setModal] = useState(false)
   const [guardando, setGuardando] = useState(false)
+  const [notaEditando, setNotaEditando] = useState(null)
   const [form, setForm] = useState({ titulo: '', contenido: '', importante: false })
 
   const cargar = async () => {
@@ -609,22 +656,33 @@ function Notas({ acuario, onMensaje, onHistorialCambiado }) {
 
   useEffect(() => { cargar() }, [acuario.id])
 
+  const abrir = (item = null) => {
+    setNotaEditando(item)
+    setForm({ titulo: item?.titulo ?? '', contenido: item?.contenido ?? '', importante: item?.importante ?? false })
+    setModal(true)
+  }
+
   const guardar = async (e) => {
     e.preventDefault()
     setGuardando(true)
-    const { error } = await supabase.from('notas_acuario').insert([{
+    const datos = {
       acuario_id: acuario.id,
       titulo: form.titulo.trim() || null,
       contenido: form.contenido.trim(),
       importante: form.importante,
-    }])
-    if (error) onMensaje(`Error: ${error.message}`)
+      updated_at: new Date().toISOString(),
+    }
+    const { error } = notaEditando
+      ? await supabase.from('notas_acuario').update(datos).eq('id', notaEditando.id)
+      : await supabase.from('notas_acuario').insert([datos])
+    if (error) onMensaje(`❌ Error: ${error.message}`)
     else {
       setModal(false)
+      setNotaEditando(null)
       setForm({ titulo: '', contenido: '', importante: false })
       await cargar()
       onHistorialCambiado?.()
-      onMensaje('✅ Nota guardada.')
+      onMensaje(notaEditando ? '✅ Nota actualizada.' : '✅ Nota guardada.')
     }
     setGuardando(false)
   }
@@ -644,7 +702,7 @@ function Notas({ acuario, onMensaje, onHistorialCambiado }) {
 
   return (
     <div>
-      <Encabezado titulo="Notas" descripcion="Observaciones rápidas e información importante." boton="+ Nota" onBoton={() => setModal(true)} />
+      <Encabezado titulo="Notas" descripcion="Observaciones rápidas e información importante." boton="+ Nota" onBoton={() => abrir()} />
       {cargando ? <div className="sin-datos-panel">Cargando...</div> :
        items.length === 0 ? <div className="panel-vacio"><div className="icono-vacio">📝</div><h3>No hay notas</h3></div> :
        <div className="grid-notas">
@@ -653,17 +711,17 @@ function Notas({ acuario, onMensaje, onHistorialCambiado }) {
             <div className="nota-cabecera"><span>{item.importante ? '⭐ IMPORTANTE' : fechaBonita(item.created_at)}</span><button onClick={() => importante(item)}>{item.importante ? '★' : '☆'}</button></div>
             {item.titulo && <h3>{item.titulo}</h3>}
             <p>{item.contenido}</p>
-            <button className="boton-eliminar-entidad" onClick={() => eliminar(item)}>Eliminar</button>
+            <div className="acciones-entidad"><button className="boton-claro" onClick={() => abrir(item)}>Editar</button><button className="boton-eliminar-entidad" onClick={() => eliminar(item)}>Eliminar</button></div>
           </article>
         ))}
       </div>}
 
-      {modal && <Modal titulo="Nueva nota" subtitulo="Guarda una observación del acuario." onCerrar={() => setModal(false)}>
+      {modal && <Modal titulo={notaEditando ? 'Editar nota' : 'Nueva nota'} subtitulo="Guarda una observación del acuario." onCerrar={() => { if (!guardando) { setModal(false); setNotaEditando(null) } }}>
         <form onSubmit={guardar}>
           <div className="campo-formulario"><label>Título</label><input value={form.titulo} onChange={(e) => setForm({ ...form, titulo: e.target.value })} /></div>
           <div className="campo-formulario"><label>Contenido *</label><textarea rows="5" value={form.contenido} onChange={(e) => setForm({ ...form, contenido: e.target.value })} required /></div>
           <label className="check-simple"><input type="checkbox" checked={form.importante} onChange={(e) => setForm({ ...form, importante: e.target.checked })} /> Marcar como importante</label>
-          <div className="acciones-modal"><button type="button" className="boton-cancelar" onClick={() => setModal(false)}>Cancelar</button><button className="boton-principal" disabled={guardando}>{guardando ? 'Guardando...' : 'Guardar nota'}</button></div>
+          <div className="acciones-modal"><button type="button" className="boton-cancelar" disabled={guardando} onClick={() => { setModal(false); setNotaEditando(null) }}>Cancelar</button><button className="boton-principal" disabled={guardando}>{guardando ? <><span className="spinner-mini" /> Guardando...</> : notaEditando ? 'Guardar cambios' : 'Guardar nota'}</button></div>
         </form>
       </Modal>}
     </div>
@@ -679,6 +737,9 @@ function Fotos({ acuario, session, onMensaje }) {
   const [preview, setPreview] = useState('')
   const [descripcion, setDescripcion] = useState('')
   const [modoCalidad, setModoCalidad] = useState('miniatura')
+  const [fotoEditando, setFotoEditando] = useState(null)
+  const [descripcionEdicion, setDescripcionEdicion] = useState('')
+  const [guardandoEdicion, setGuardandoEdicion] = useState(false)
 
   const cargar = async () => {
     setCargando(true)
@@ -875,6 +936,27 @@ function Fotos({ acuario, session, onMensaje }) {
     }
   }
 
+  const guardarDescripcion = async (e) => {
+    e.preventDefault()
+    if (!fotoEditando?.id) return
+    setGuardandoEdicion(true)
+
+    const { error } = await supabase
+      .from('fotos_acuario')
+      .update({ descripcion: descripcionEdicion.trim() || null, updated_at: new Date().toISOString() })
+      .eq('id', fotoEditando.id)
+
+    if (error) {
+      onMensaje(`❌ No se pudo actualizar la descripción: ${error.message}`)
+    } else {
+      await cargar()
+      setFotoEditando(null)
+      setDescripcionEdicion('')
+      onMensaje('✅ Descripción de la foto actualizada.')
+    }
+    setGuardandoEdicion(false)
+  }
+
   return (
     <div>
       <Encabezado
@@ -927,12 +1009,14 @@ function Fotos({ acuario, session, onMensaje }) {
                   <p>{item.descripcion}</p>
                 )}
 
-                <button
-                  className="boton-eliminar-entidad"
-                  onClick={() => eliminar(item)}
-                >
-                  Eliminar
-                </button>
+                <div className="acciones-entidad">
+                  <button className="boton-claro" onClick={() => { setFotoEditando(item); setDescripcionEdicion(item.descripcion ?? '') }}>
+                    Editar descripción
+                  </button>
+                  <button className="boton-eliminar-entidad" onClick={() => eliminar(item)}>
+                    Eliminar
+                  </button>
+                </div>
               </div>
             </article>
           ))}
@@ -1120,6 +1204,22 @@ function Fotos({ acuario, session, onMensaje }) {
                   ? 'Guardando...'
                   : 'Guardar foto'}
               </button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {fotoEditando && (
+        <Modal titulo="Editar descripción" subtitulo="La fotografía original no será reemplazada." onCerrar={() => { if (!guardandoEdicion) setFotoEditando(null) }}>
+          <form onSubmit={guardarDescripcion}>
+            <img className="foto-edicion-preview" src={fotoEditando.url} alt={fotoEditando.descripcion || 'Foto del acuario'} />
+            <div className="campo-formulario">
+              <label>Descripción</label>
+              <textarea rows="4" value={descripcionEdicion} onChange={(e) => setDescripcionEdicion(e.target.value)} placeholder="Describe lo que se observa en esta foto..." />
+            </div>
+            <div className="acciones-modal">
+              <button type="button" className="boton-cancelar" disabled={guardandoEdicion} onClick={() => setFotoEditando(null)}>Cancelar</button>
+              <button className="boton-principal" disabled={guardandoEdicion}>{guardandoEdicion ? <><span className="spinner-mini" /> Guardando...</> : 'Guardar cambios'}</button>
             </div>
           </form>
         </Modal>
