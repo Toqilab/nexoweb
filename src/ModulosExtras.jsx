@@ -149,9 +149,23 @@ function Habitantes({ acuario, onMensaje }) {
       observaciones: form.observaciones.trim() || null,
       updated_at: new Date().toISOString(),
     }
-    const { error } = habitanteEditando
+    let temperaturaPendiente = false
+    let { error } = habitanteEditando
       ? await supabase.from('habitantes').update(datos).eq('id', habitanteEditando.id)
       : await supabase.from('habitantes').insert([datos])
+
+    // Compatibilidad: permite guardar aunque Supabase todavía no haya
+    // actualizado su caché de esquema después de ejecutar la migración.
+    if (error && /temperatura_(min|max)_c|schema cache|column/i.test(error.message || '')) {
+      temperaturaPendiente = true
+      const datosCompatibles = { ...datos }
+      delete datosCompatibles.temperatura_min_c
+      delete datosCompatibles.temperatura_max_c
+      const reintento = habitanteEditando
+        ? await supabase.from('habitantes').update(datosCompatibles).eq('id', habitanteEditando.id)
+        : await supabase.from('habitantes').insert([datosCompatibles])
+      error = reintento.error
+    }
     if (error) onMensaje(`❌ Error: ${error.message}`)
     else {
       setModal(false)
@@ -159,7 +173,7 @@ function Habitantes({ acuario, onMensaje }) {
       await cargar()
       const objetivo = acuario.temperatura_objetivo == null ? null : Number(acuario.temperatura_objetivo)
       const incompatible = objetivo != null && ((form.temperatura_min_c !== '' && objetivo < Number(form.temperatura_min_c)) || (form.temperatura_max_c !== '' && objetivo > Number(form.temperatura_max_c)))
-      onMensaje(`${habitanteEditando ? '✅ Habitante actualizado.' : '✅ Habitante registrado.'}${incompatible ? ` ⚠️ La temperatura objetivo (${objetivo} °C) está fuera de su rango.` : ''}`)
+      onMensaje(`${habitanteEditando ? '✅ Habitante actualizado.' : '✅ Habitante registrado.'}${temperaturaPendiente ? ' ⚠️ Los datos principales se guardaron, pero Supabase aún no reconoce los campos de temperatura.' : incompatible ? ` ⚠️ La temperatura objetivo (${objetivo} °C) está fuera de su rango.` : ''}`)
     }
     setGuardando(false)
   }
@@ -246,6 +260,11 @@ function Habitantes({ acuario, onMensaje }) {
               <div className="campo-formulario"><label>Sexo</label><select value={form.sexo} onChange={(e) => setForm({ ...form, sexo: e.target.value })}><option value="">Sin especificar</option><option>Macho</option><option>Hembra</option><option>Mixto</option></select></div>
               <div className="campo-formulario"><label>Fecha ingreso</label><input type="date" value={form.fecha_ingreso} onChange={(e) => setForm({ ...form, fecha_ingreso: e.target.value })} /></div>
             </div>
+            <div className="fila-formulario">
+              <div className="campo-formulario"><label>Temperatura mínima °C <span>(opcional)</span></label><input type="number" step="0.1" inputMode="decimal" value={form.temperatura_min_c} onChange={(e) => setForm({ ...form, temperatura_min_c: e.target.value })} /></div>
+              <div className="campo-formulario"><label>Temperatura máxima °C <span>(opcional)</span></label><input type="number" step="0.1" inputMode="decimal" value={form.temperatura_max_c} onChange={(e) => setForm({ ...form, temperatura_max_c: e.target.value })} /></div>
+            </div>
+            <small className="ayuda-temperatura">Solo se validará cuando definas uno o ambos límites.</small>
             <div className="campo-formulario"><label>Observaciones</label><textarea rows="3" value={form.observaciones} onChange={(e) => setForm({ ...form, observaciones: e.target.value })} /></div>
             <div className="acciones-modal"><button type="button" className="boton-cancelar" disabled={guardando} onClick={() => { setModal(false); setHabitanteEditando(null) }}>Cancelar</button><button className="boton-principal" disabled={guardando}>{guardando ? <><span className="spinner-mini" /> Guardando...</> : habitanteEditando ? 'Guardar cambios' : 'Guardar'}</button></div>
           </form>
@@ -263,11 +282,6 @@ function Habitantes({ acuario, onMensaje }) {
             <div className="confirmacion-aviso">
               Comprueba que seleccionaste el registro correcto antes de continuar.
             </div>
-            <div className="fila-formulario">
-              <div className="campo-formulario"><label>Temperatura mínima °C <span>(opcional)</span></label><input type="number" step="0.1" inputMode="decimal" value={form.temperatura_min_c} onChange={(e) => setForm({ ...form, temperatura_min_c: e.target.value })} /></div>
-              <div className="campo-formulario"><label>Temperatura máxima °C <span>(opcional)</span></label><input type="number" step="0.1" inputMode="decimal" value={form.temperatura_max_c} onChange={(e) => setForm({ ...form, temperatura_max_c: e.target.value })} /></div>
-            </div>
-            <small className="ayuda-temperatura">Solo se validará cuando definas uno o ambos límites.</small>
             <div className="confirmacion-acciones">
               <button className="boton-cancelar" disabled={Boolean(eliminandoId)} onClick={() => setHabitanteEliminar(null)}>
                 Cancelar
@@ -333,15 +347,26 @@ function Plantas({ acuario, onMensaje }) {
       observaciones: form.observaciones.trim() || null,
       updated_at: new Date().toISOString(),
     }
-    const { error } = plantaEditando
+    let temperaturaPendiente = false
+    let { error } = plantaEditando
       ? await supabase.from('plantas').update(datos).eq('id', plantaEditando.id)
       : await supabase.from('plantas').insert([datos])
+    if (error && /temperatura_(min|max)_c|schema cache|column/i.test(error.message || '')) {
+      temperaturaPendiente = true
+      const datosCompatibles = { ...datos }
+      delete datosCompatibles.temperatura_min_c
+      delete datosCompatibles.temperatura_max_c
+      const reintento = plantaEditando
+        ? await supabase.from('plantas').update(datosCompatibles).eq('id', plantaEditando.id)
+        : await supabase.from('plantas').insert([datosCompatibles])
+      error = reintento.error
+    }
     if (error) onMensaje(`❌ Error: ${error.message}`)
     else {
       setModal(false); setPlantaEditando(null); await cargar()
       const objetivo = acuario.temperatura_objetivo == null ? null : Number(acuario.temperatura_objetivo)
       const incompatible = objetivo != null && ((form.temperatura_min_c !== '' && objetivo < Number(form.temperatura_min_c)) || (form.temperatura_max_c !== '' && objetivo > Number(form.temperatura_max_c)))
-      onMensaje(`${plantaEditando ? '✅ Planta actualizada.' : '✅ Planta registrada.'}${incompatible ? ` ⚠️ La temperatura objetivo (${objetivo} °C) está fuera de su rango.` : ''}`)
+      onMensaje(`${plantaEditando ? '✅ Planta actualizada.' : '✅ Planta registrada.'}${temperaturaPendiente ? ' ⚠️ Los datos principales se guardaron, pero Supabase aún no reconoce los campos de temperatura.' : incompatible ? ` ⚠️ La temperatura objetivo (${objetivo} °C) está fuera de su rango.` : ''}`)
     }
     setGuardando(false)
   }

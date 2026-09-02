@@ -12,7 +12,7 @@ const SelectorRegistroActividades = lazy(() =>
   import('./ActividadesFinal.jsx').then((modulo) => ({ default: modulo.SelectorRegistroActividades }))
 )
 
-const NEXOWEB_VERSION = '1.8.0'
+const NEXOWEB_VERSION = '1.8.2'
 
 const portadaDefaultAcuario = (tipo = '') => {
   const valor = String(tipo || '').toLowerCase()
@@ -1775,8 +1775,8 @@ function App() {
           const registro = await navigator.serviceWorker?.ready
           registro?.showNotification?.(`NexoWeb · ${tarea.titulo || 'Actividad pendiente'}`, {
             body: `Programada para ${new Date(tarea.fecha_programada).toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit' })}.`,
-            icon: '/icons.svg',
-            badge: '/icons.svg',
+            icon: '/icons/nexoweb-192.png',
+            badge: '/icons/nexoweb-192.png',
             tag: clave,
             data: { url: '/' },
           })

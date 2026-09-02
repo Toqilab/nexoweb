@@ -428,8 +428,8 @@ function ConfiguracionAcuario({ acuario, session, onMensaje, onAcuarioActualizad
                 const registro = await navigator.serviceWorker?.ready
                 registro?.showNotification?.('NexoWeb', {
                   body: '✅ Notificaciones activadas.',
-                  icon: '/icons.svg',
-                  badge: '/icons.svg',
+                  icon: '/icons/nexoweb-192.png',
+                  badge: '/icons/nexoweb-192.png',
                   data: { url: '/' },
                 })
                 onMensaje('✅ Permiso de notificaciones activado.')

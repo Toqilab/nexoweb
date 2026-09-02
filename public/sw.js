@@ -1,5 +1,5 @@
-const CACHE_NAME = 'nexoweb-v1.8.0'
-const APP_SHELL = ['/', '/index.html', '/manifest.webmanifest', '/icons.svg']
+const CACHE_NAME = 'nexoweb-v1.8.2'
+const APP_SHELL = ['/', '/index.html', '/manifest.webmanifest', '/icons/nexoweb-192.png', '/icons/nexoweb-512.png']
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -62,8 +62,8 @@ self.addEventListener('push', (event) => {
   event.waitUntil(
     self.registration.showNotification(aviso.title || 'NexoWeb', {
       body: aviso.body || 'Tienes una actividad pendiente en tu acuario.',
-      icon: '/icons.svg',
-      badge: '/icons.svg',
+      icon: '/icons/nexoweb-192.png',
+      badge: '/icons/nexoweb-192.png',
       tag: aviso.tag || 'nexoweb-recordatorio',
       data: { url: aviso.url || '/' },
     })
