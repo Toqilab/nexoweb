@@ -2679,6 +2679,111 @@ html.nexoweb-oscuro .sugerencias-especies button {
   margin-bottom: 18px;
 }
 
+.vida-inicio {
+  margin: 18px 0;
+}
+
+.vida-inicio-cabecera {
+  margin-bottom: 11px;
+}
+
+.vida-inicio-cabecera > div > span {
+  color: #087f6b;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .09em;
+}
+
+.vida-inicio-cabecera h2 {
+  margin: 3px 0 2px;
+  font-size: 20px;
+}
+
+.vida-inicio-cabecera p {
+  margin: 0;
+  color: #667085;
+  font-size: 12px;
+}
+
+.vida-inicio-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.vida-card {
+  border: 1px solid #dce9e7;
+  border-radius: 18px;
+  padding: 15px;
+  text-align: left;
+  color: #17212b;
+  background: linear-gradient(145deg, #ffffff, #f5fbfa);
+  transition: transform .18s ease, box-shadow .18s ease;
+}
+
+.vida-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 24px rgba(23, 33, 43, .08);
+}
+
+.vida-card-plantas { background: linear-gradient(145deg, #ffffff, #f2fbf4); }
+
+.vida-card-titulo {
+  display: grid;
+  grid-template-columns: 46px 1fr auto;
+  align-items: center;
+  gap: 10px;
+}
+
+.vida-card-icono {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  background: #e6f8f5;
+  font-size: 25px;
+}
+
+.vida-card-plantas .vida-card-icono { background: #eaf8ed; }
+.vida-card-titulo small,
+.vida-card-titulo strong { display: block; }
+.vida-card-titulo small { color: #667085; font-size: 11px; }
+.vida-card-titulo strong { margin-top: 1px; font-size: 24px; }
+.vida-card-abrir { color: #087f6b; font-size: 11px; font-weight: 800; }
+.vida-card > p { min-height: 38px; margin: 15px 0; color: #667085; font-size: 12px; line-height: 1.45; }
+
+.vida-especies {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin: 14px 0;
+}
+
+.vida-especies > span,
+.vida-especies > em {
+  padding: 7px 9px;
+  border-radius: 10px;
+  background: rgba(255,255,255,.85);
+  border: 1px solid #e4eeec;
+  font-style: normal;
+  font-size: 10px;
+}
+
+.vida-especies strong,
+.vida-especies small { display: block; }
+.vida-especies small { margin-top: 2px; color: #667085; }
+.vida-card-accion { display: block; color: #087f6b; font-size: 10px; font-weight: 800; }
+
+html.nexoweb-oscuro .vida-card {
+  color: #f5f7fa;
+  border-color: #33414d;
+  background: linear-gradient(145deg, #202830, #18242b);
+}
+
+html.nexoweb-oscuro .vida-especies > span,
+html.nexoweb-oscuro .vida-especies > em { background: #26333c; border-color: #364651; }
+
 .panel-inteligente-titulo span {
   display: block;
   font-size: 9px;
@@ -3229,6 +3334,8 @@ html.nexoweb-oscuro .resumen-costos {
   .config-temperatura { max-width: none; }
   .config-guardar { position: sticky; bottom: 72px; z-index: 12; margin: 16px -6px -6px; padding: 8px; border-radius: 13px; background: rgba(255,255,255,.94); box-shadow: 0 8px 26px rgba(16,24,40,.14); backdrop-filter: blur(8px); }
   .config-guardar .boton-principal { width: 100%; min-height: 48px; }
+  .vida-inicio-grid { grid-template-columns: 1fr; }
+  .vida-card { padding: 14px; }
 }
 
 @media (max-width: 480px) {

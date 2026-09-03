@@ -12,7 +12,7 @@ const SelectorRegistroActividades = lazy(() =>
   import('./ActividadesFinal.jsx').then((modulo) => ({ default: modulo.SelectorRegistroActividades }))
 )
 
-const NEXOWEB_VERSION = '1.8.3'
+const NEXOWEB_VERSION = '1.9.0'
 
 const portadaDefaultAcuario = (tipo = '') => {
   const valor = String(tipo || '').toLowerCase()
@@ -165,6 +165,7 @@ function App() {
   const [tareasHoy, setTareasHoy] = useState([])
   const [tareasVencidas, setTareasVencidas] = useState([])
   const [cargandoTareas, setCargandoTareas] = useState(false)
+  const [vidaResumen, setVidaResumen] = useState({ habitantes: [], plantas: [], cargando: false })
 
   /* =========================================================
      PRODUCTOS
@@ -3646,6 +3647,22 @@ function App() {
     )
   }
 
+  const cargarVidaResumen = async () => {
+    if (!acuarioSeleccionado?.id) return
+    setVidaResumen((actual) => ({ ...actual, cargando: true }))
+
+    const [habitantes, plantas] = await Promise.all([
+      supabase.from('habitantes').select('*').eq('acuario_id', acuarioSeleccionado.id).or('estado.is.null,estado.neq.baja').order('created_at', { ascending: false }),
+      supabase.from('plantas').select('*').eq('acuario_id', acuarioSeleccionado.id).or('estado.is.null,estado.neq.baja').order('created_at', { ascending: false }),
+    ])
+
+    setVidaResumen({
+      habitantes: habitantes.data ?? [],
+      plantas: plantas.data ?? [],
+      cargando: false,
+    })
+  }
+
   const renderResumen = () => {
     const productosActivos =
       productosAcuario.filter(
@@ -3753,6 +3770,50 @@ function App() {
         )}
 
         <ResumenInteligente acuario={acuarioSeleccionado} />
+
+        <section className="vida-inicio">
+          <div className="vida-inicio-cabecera">
+            <div>
+              <span>VIDA DEL ACUARIO</span>
+              <h2>Quiénes viven aquí</h2>
+              <p>Habitantes y plantas visibles sin tener que buscarlos en el menú.</p>
+            </div>
+          </div>
+
+          <div className="vida-inicio-grid">
+            {[{
+              tipo: 'habitantes', icono: '🐟', titulo: 'Habitantes', items: vidaResumen.habitantes,
+              cantidad: vidaResumen.habitantes.reduce((total, item) => total + Number(item.cantidad || 1), 0),
+              vacio: 'Aún no has agregado peces u otros habitantes.', accion: '+ Agregar habitante',
+            }, {
+              tipo: 'plantas', icono: '🌿', titulo: 'Plantas', items: vidaResumen.plantas,
+              cantidad: vidaResumen.plantas.reduce((total, item) => total + Number(item.cantidad || 1), 0),
+              vacio: 'Aún no has agregado plantas acuáticas.', accion: '+ Agregar planta',
+            }].map((grupo) => (
+              <button type="button" className={`vida-card vida-card-${grupo.tipo}`} key={grupo.tipo} onClick={() => setSeccionActiva(grupo.tipo)}>
+                <div className="vida-card-titulo">
+                  <span className="vida-card-icono">{grupo.icono}</span>
+                  <div><small>{grupo.titulo}</small><strong>{vidaResumen.cargando ? '…' : grupo.cantidad}</strong></div>
+                  <span className="vida-card-abrir">Ver →</span>
+                </div>
+
+                {grupo.items.length ? (
+                  <div className="vida-especies">
+                    {grupo.items.slice(0, 4).map((item) => (
+                      <span key={item.id}>
+                        <strong>{item.nombre_comun}</strong>
+                        {(item.temperatura_min_c != null || item.temperatura_max_c != null) && <small>{item.temperatura_min_c ?? '—'}–{item.temperatura_max_c ?? '—'} °C</small>}
+                      </span>
+                    ))}
+                    {grupo.items.length > 4 && <em>+{grupo.items.length - 4} más</em>}
+                  </div>
+                ) : <p>{vidaResumen.cargando ? 'Cargando información…' : grupo.vacio}</p>}
+
+                <span className="vida-card-accion">{grupo.items.length ? `${grupo.items.length} especie(s) registrada(s)` : grupo.accion}</span>
+              </button>
+            ))}
+          </div>
+        </section>
 
         <section className="seccion-hoy">
           <div className="titulo-hoy">
@@ -3985,6 +4046,7 @@ function App() {
   useEffect(() => {
     if (!acuarioSeleccionado?.id) return
 
+    if (seccionActiva === 'resumen') cargarVidaResumen()
     if (seccionActiva === 'agua') cargarMedicionesAgua()
     if (seccionActiva === 'mantenimiento') cargarMantenimientos()
     if (seccionActiva === 'historial') cargarHistorialGeneral()
