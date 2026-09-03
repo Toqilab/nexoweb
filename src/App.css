@@ -2876,6 +2876,10 @@ html.nexoweb-oscuro .vida-especies > em { background: #26333c; border-color: #36
 }
 
 .colaboracion-grid { display: grid; grid-template-columns: minmax(0, .85fr) minmax(0, 1.15fr); gap: 15px; }
+.aviso-configuracion-colaboracion { padding: 17px; border: 1px solid #f5c86b; border-left: 5px solid #f79009; border-radius: 14px; background: #fffaeb; }
+.aviso-configuracion-colaboracion strong { display: block; color: #93370d; }
+.aviso-configuracion-colaboracion p { margin: 6px 0 12px; color: #7a2e0e; font-size: 12px; line-height: 1.5; }
+.aviso-configuracion-colaboracion code { font-weight: 800; }
 .texto-secundario { color: #667085; font-size: 12px; line-height: 1.5; }
 .miembro-card { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 11px; margin-top: 9px; border: 1px solid #eaecf0; border-radius: 12px; background: #f8fafb; }
 .miembro-card strong, .miembro-card small { display: block; overflow-wrap: anywhere; }
@@ -2896,6 +2900,9 @@ html.nexoweb-oscuro .vida-especies > em { background: #26333c; border-color: #36
 .chat-form { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
 .chat-form textarea { width: 100%; resize: none; padding: 11px; border: 1px solid #d0d5dd; border-radius: 12px; }
 .chat-limite { display: block; margin-top: 5px; color: #667085; text-align: right; font-size: 9px; }
+.boton-chat-flotante { position: fixed; right: 22px; bottom: 22px; z-index: 1150; display: grid; place-items: center; width: 56px; height: 56px; border: 0; border-radius: 50%; background: #087f6b; color: #fff; box-shadow: 0 12px 30px rgba(8,127,107,.32); font-size: 25px; }
+.boton-chat-flotante strong { position: absolute; top: -3px; right: -3px; display: grid; place-items: center; min-width: 21px; height: 21px; padding: 0 5px; border: 2px solid #fff; border-radius: 20px; background: #f04438; color: #fff; font-size: 9px; }
+.boton-chat-flotante:hover { transform: translateY(-2px); }
 html.nexoweb-oscuro .miembro-card, html.nexoweb-oscuro .chat-mensaje { background: #26313a; border-color: #3a4650; }
 html.nexoweb-oscuro .chat-mensaje.propio { background: #17463f; }
 html.nexoweb-oscuro .chat-mensaje p { color: #f5f7fa; }
@@ -3365,6 +3372,7 @@ html.nexoweb-oscuro .resumen-costos {
   .chat-lista { min-height: 190px; max-height: 330px; }
   .chat-form { grid-template-columns: 1fr; }
   .chat-form .boton-principal { width: 100%; }
+  .boton-chat-flotante { right: 16px; bottom: 84px; width: 52px; height: 52px; font-size: 22px; }
 }
 
 @media (max-width: 480px) {

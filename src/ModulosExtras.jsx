@@ -48,7 +48,7 @@ function Encabezado({ titulo, descripcion, boton, onBoton }) {
         <h2>{titulo}</h2>
         <p>{descripcion}</p>
       </div>
-      <button type="button" className="boton-principal" onClick={() => onBoton?.()}>{boton}</button>
+      {boton && <button type="button" className="boton-principal" onClick={() => onBoton?.()}>{boton}</button>}
     </div>
   )
 }
@@ -1294,6 +1294,7 @@ function Colaboracion({ acuario, session, onMensaje }) {
   const [texto, setTexto] = useState('')
   const [cargando, setCargando] = useState(true)
   const [guardando, setGuardando] = useState(false)
+  const [basePreparada, setBasePreparada] = useState(true)
   const esPropietario = acuario.usuario_id === session?.user?.id
 
   const cargar = async () => {
@@ -1303,10 +1304,16 @@ function Colaboracion({ acuario, session, onMensaje }) {
       supabase.from('acuario_miembros').select('*').eq('acuario_id', acuario.id).order('created_at'),
       supabase.from('mensajes_acuario').select('*').eq('acuario_id', acuario.id).gt('expires_at', new Date().toISOString()).order('created_at', { ascending: true }).limit(100),
     ])
-    if (respuestaMiembros.error) onMensaje(`Error de miembros: ${respuestaMiembros.error.message}`)
-    else setMiembros(respuestaMiembros.data ?? [])
-    if (respuestaMensajes.error) onMensaje(`Error de mensajes: ${respuestaMensajes.error.message}`)
-    else setMensajes(respuestaMensajes.data ?? [])
+    const faltaMigracion = [respuestaMiembros.error, respuestaMensajes.error].some((error) =>
+      error && /schema cache|could not find the table|relation .* does not exist/i.test(error.message || '')
+    )
+    setBasePreparada(!faltaMigracion)
+    if (!faltaMigracion) {
+      if (respuestaMiembros.error) onMensaje(`Error de miembros: ${respuestaMiembros.error.message}`)
+      else setMiembros(respuestaMiembros.data ?? [])
+      if (respuestaMensajes.error) onMensaje(`Error de mensajes: ${respuestaMensajes.error.message}`)
+      else setMensajes(respuestaMensajes.data ?? [])
+    }
     setCargando(false)
   }
 
@@ -1358,7 +1365,13 @@ function Colaboracion({ acuario, session, onMensaje }) {
     <div>
       <Encabezado titulo="Compartir y mensajes" descripcion="Vincula cuentas y coordina el cuidado del acuario." />
 
-      <div className="colaboracion-grid">
+      {!basePreparada && <div className="aviso-configuracion-colaboracion">
+        <strong>⚙️ Falta preparar Supabase</strong>
+        <p>Ejecuta el archivo <code>supabase_colaboracion.sql</code> en el SQL Editor. Después vuelve a abrir esta pantalla.</p>
+        <button type="button" className="boton-claro" onClick={cargar}>Comprobar nuevamente</button>
+      </div>}
+
+      {basePreparada && <div className="colaboracion-grid">
         <section className="panel-config">
           <h3>👥 Acceso compartido</h3>
           <p className="texto-secundario">El dueño conserva el control. La otra persona debe crear primero una cuenta en NexoWeb.</p>
@@ -1395,7 +1408,7 @@ function Colaboracion({ acuario, session, onMensaje }) {
           </form>
           <small className="chat-limite">{texto.length}/300 · caduca en 7 días</small>
         </section>
-      </div>
+      </div>}
     </div>
   )
 }

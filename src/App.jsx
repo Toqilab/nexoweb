@@ -12,7 +12,7 @@ const SelectorRegistroActividades = lazy(() =>
   import('./ActividadesFinal.jsx').then((modulo) => ({ default: modulo.SelectorRegistroActividades }))
 )
 
-const NEXOWEB_VERSION = '2.0.0'
+const NEXOWEB_VERSION = '2.0.1'
 
 const portadaDefaultAcuario = (tipo = '') => {
   const valor = String(tipo || '').toLowerCase()
@@ -94,6 +94,7 @@ function App() {
   const [eliminandoAcuarioId, setEliminandoAcuarioId] = useState(null)
   const [acuarioEliminarPendiente, setAcuarioEliminarPendiente] = useState(null)
   const [mostrarDetallesAcuario, setMostrarDetallesAcuario] = useState(false)
+  const [mensajesNoLeidos, setMensajesNoLeidos] = useState(0)
   const [deferredInstallPrompt, setDeferredInstallPrompt] = useState(null)
   const [appInstalada, setAppInstalada] = useState(
     window.matchMedia?.('(display-mode: standalone)')?.matches ||
@@ -3675,6 +3676,43 @@ function App() {
     })
   }
 
+  const revisarMensajesNuevos = async () => {
+    if (!acuarioSeleccionado?.id || !session?.user?.id) return
+    const { data, error } = await supabase
+      .from('mensajes_acuario')
+      .select('id,usuario_id,autor_email,contenido,created_at')
+      .eq('acuario_id', acuarioSeleccionado.id)
+      .gt('expires_at', new Date().toISOString())
+      .order('created_at', { ascending: false })
+      .limit(20)
+    if (error) return
+
+    const claveVistos = `nexoweb-mensajes-vistos-${acuarioSeleccionado.id}`
+    const vistosDesde = localStorage.getItem(claveVistos) || new Date(0).toISOString()
+    const nuevos = (data ?? []).filter((item) => item.usuario_id !== session.user.id && item.created_at > vistosDesde)
+    setMensajesNoLeidos(nuevos.length)
+
+    const ultimo = nuevos[0]
+    const claveAviso = ultimo ? `nexoweb-mensaje-avisado-${ultimo.id}` : ''
+    if (ultimo && 'Notification' in window && Notification.permission === 'granted' && !localStorage.getItem(claveAviso)) {
+      localStorage.setItem(claveAviso, new Date().toISOString())
+      const registro = await navigator.serviceWorker?.ready
+      registro?.showNotification?.('Nuevo mensaje sobre tu acuario', {
+        body: `${ultimo.autor_email}: ${ultimo.contenido}`,
+        icon: '/icons/nexoweb-192.png',
+        badge: '/icons/nexoweb-192.png',
+        tag: `mensaje-${ultimo.id}`,
+        data: { url: '/' },
+      })
+    }
+  }
+
+  const abrirMensajes = () => {
+    if (acuarioSeleccionado?.id) localStorage.setItem(`nexoweb-mensajes-vistos-${acuarioSeleccionado.id}`, new Date().toISOString())
+    setMensajesNoLeidos(0)
+    setSeccionActiva('colaboracion')
+  }
+
   const renderResumen = () => {
     const productosActivos =
       productosAcuario.filter(
@@ -4064,6 +4102,13 @@ function App() {
     if (seccionActiva === 'mantenimiento') cargarMantenimientos()
     if (seccionActiva === 'historial') cargarHistorialGeneral()
   }, [seccionActiva, acuarioSeleccionado?.id])
+
+  useEffect(() => {
+    if (!acuarioSeleccionado?.id) return
+    revisarMensajesNuevos()
+    const intervalo = window.setInterval(revisarMensajesNuevos, 60000)
+    return () => window.clearInterval(intervalo)
+  }, [acuarioSeleccionado?.id, session?.user?.id])
 
   const renderContenidoEscritorio = () => {
     if (
@@ -4486,6 +4531,11 @@ function App() {
             {renderContenidoEscritorio()}
           </main>
         </div>
+
+        <button type="button" className="boton-chat-flotante" onClick={abrirMensajes} aria-label="Abrir mensajes del acuario">
+          <span>💬</span>
+          {mensajesNoLeidos > 0 && <strong>{mensajesNoLeidos > 9 ? '9+' : mensajesNoLeidos}</strong>}
+        </button>
 
         <nav className="bottom-nav">
           <button
