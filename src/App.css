@@ -2744,6 +2744,18 @@ html.nexoweb-oscuro .sugerencias-especies button {
 .anotacion-habitante textarea { width: 100%; min-height: 48px; resize: vertical; padding: 9px 11px; border: 1px solid #d0d5dd; border-radius: 11px; background: #fff; font: inherit; font-size: 11px; }
 .anotacion-habitante textarea[readonly] { color: #475467; background: #f2f4f7; }
 .boton-guardar-anotacion { min-height: 40px; padding: 8px 12px; border: 0; border-radius: 10px; background: #087f6b; color: #fff; font-weight: 800; }
+.habitantes-compactos { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+.habitante-compacto { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; padding: 9px 10px; border: 1px solid #eaecf0; border-radius: 12px; background: #f8fafb; color: #17212b; text-align: left; }
+.habitante-compacto:hover { border-color: #98d6cb; background: #effbf8; }
+.badge-anotaciones { flex: 0 0 auto; color: #667085; font-size: 9px; font-weight: 800; }
+.badge-anotaciones.tiene { padding: 4px 7px; border-radius: 20px; background: #dff5f0; color: #087f6b; }
+.modal-anotaciones-habitante { width: min(620px, 100%); max-height: min(720px, calc(100dvh - 30px)); overflow: hidden; }
+.nueva-anotacion-habitante { display: grid; gap: 8px; padding-bottom: 13px; border-bottom: 1px solid #eaecf0; }
+.nueva-anotacion-habitante textarea { width: 100%; resize: vertical; padding: 11px; border: 1px solid #d0d5dd; border-radius: 12px; font: inherit; }
+.historial-anotaciones-habitante { display: grid; gap: 9px; max-height: 390px; margin-top: 12px; overflow-y: auto; }
+.historial-anotaciones-habitante article { padding: 11px; border-left: 4px solid #10a88d; border-radius: 0 11px 11px 0; background: #f8fafb; }
+.historial-anotaciones-habitante time { color: #087f6b; font-size: 9px; font-weight: 800; }
+.historial-anotaciones-habitante p { margin: 5px 0 0; color: #344054; font-size: 12px; white-space: pre-wrap; }
 
 .vida-card-titulo {
   display: grid;
@@ -2803,6 +2815,9 @@ html.nexoweb-oscuro .vida-especies > em { background: #26333c; border-color: #36
 html.nexoweb-oscuro .anotaciones-habitantes-inicio,
 html.nexoweb-oscuro .anotacion-habitante { color: #f5f7fa; border-color: #33414d; background: #202830; }
 html.nexoweb-oscuro .anotacion-habitante textarea { color: #f5f7fa; border-color: #3a4650; background: #26333c; }
+html.nexoweb-oscuro .habitante-compacto,
+html.nexoweb-oscuro .historial-anotaciones-habitante article { color: #f5f7fa; border-color: #33414d; background: #26333c; }
+html.nexoweb-oscuro .historial-anotaciones-habitante p { color: #f5f7fa; }
 
 .panel-inteligente-titulo span {
   display: block;
@@ -3425,6 +3440,7 @@ html.nexoweb-oscuro .resumen-costos {
   .anotaciones-habitantes-inicio { padding: 12px; }
   .anotaciones-habitantes-titulo { align-items: flex-start; }
   .anotaciones-habitantes-titulo p { max-width: 210px; }
+  .habitantes-compactos { grid-template-columns: 1fr; }
   .anotacion-habitante { grid-template-columns: 1fr auto; }
   .anotacion-habitante textarea { grid-column: 1 / -1; grid-row: 2; }
   .anotacion-habitante .boton-guardar-anotacion { grid-column: 2; grid-row: 1; }

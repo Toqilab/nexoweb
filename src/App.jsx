@@ -12,7 +12,7 @@ const SelectorRegistroActividades = lazy(() =>
   import('./ActividadesFinal.jsx').then((modulo) => ({ default: modulo.SelectorRegistroActividades }))
 )
 
-const NEXOWEB_VERSION = '2.2.4'
+const NEXOWEB_VERSION = '2.3.0'
 
 const portadaDefaultAcuario = (tipo = '') => {
   const valor = String(tipo || '').toLowerCase()
@@ -168,7 +168,10 @@ function App() {
   const [tareasVencidas, setTareasVencidas] = useState([])
   const [cargandoTareas, setCargandoTareas] = useState(false)
   const [vidaResumen, setVidaResumen] = useState({ habitantes: [], plantas: [], cargando: false })
-  const [anotacionesHabitantes, setAnotacionesHabitantes] = useState({})
+  const [anotacionesResumen, setAnotacionesResumen] = useState({})
+  const [habitanteAnotaciones, setHabitanteAnotaciones] = useState(null)
+  const [historialAnotaciones, setHistorialAnotaciones] = useState([])
+  const [nuevaAnotacion, setNuevaAnotacion] = useState('')
   const [guardandoAnotacionId, setGuardandoAnotacionId] = useState(null)
 
   /* =========================================================
@@ -3667,9 +3670,10 @@ function App() {
     if (!acuarioSeleccionado?.id) return
     setVidaResumen((actual) => ({ ...actual, cargando: true }))
 
-    const [habitantes, plantas] = await Promise.all([
+    const [habitantes, plantas, anotaciones] = await Promise.all([
       supabase.from('habitantes').select('*').eq('acuario_id', acuarioSeleccionado.id).or('estado.is.null,estado.neq.baja').order('created_at', { ascending: false }),
       supabase.from('plantas').select('*').eq('acuario_id', acuarioSeleccionado.id).or('estado.is.null,estado.neq.baja').order('created_at', { ascending: false }),
+      supabase.from('habitante_anotaciones').select('id,habitante_id,created_at').eq('acuario_id', acuarioSeleccionado.id).order('created_at', { ascending: false }),
     ])
 
     const habitantesActuales = habitantes.data ?? []
@@ -3678,22 +3682,35 @@ function App() {
       plantas: plantas.data ?? [],
       cargando: false,
     })
-    setAnotacionesHabitantes(Object.fromEntries(habitantesActuales.map((item) => [item.id, item.observaciones ?? ''])))
+    const resumen = {}
+    for (const nota of anotaciones.data ?? []) {
+      resumen[nota.habitante_id] = { cantidad: (resumen[nota.habitante_id]?.cantidad || 0) + 1, ultima: resumen[nota.habitante_id]?.ultima || nota.created_at }
+    }
+    setAnotacionesResumen(resumen)
   }
 
-  const guardarAnotacionHabitante = async (habitante) => {
+  const abrirAnotacionesHabitante = async (habitante) => {
+    setHabitanteAnotaciones(habitante)
+    setNuevaAnotacion('')
+    const { data, error } = await supabase.from('habitante_anotaciones').select('*').eq('acuario_id', acuarioSeleccionado.id).eq('habitante_id', habitante.id).order('created_at', { ascending: false })
+    if (error) setMensaje('Falta ejecutar supabase_anotaciones_habitantes.sql para activar el historial.')
+    setHistorialAnotaciones(data ?? [])
+  }
+
+  const guardarAnotacionHabitante = async () => {
     if (acuarioSeleccionado?.rol_acceso === 'lector') return
-    setGuardandoAnotacionId(habitante.id)
-    const observaciones = (anotacionesHabitantes[habitante.id] || '').trim() || null
+    const contenido = nuevaAnotacion.trim()
+    if (!contenido || !habitanteAnotaciones) return
+    setGuardandoAnotacionId(habitanteAnotaciones.id)
     const { error } = await supabase
-      .from('habitantes')
-      .update({ observaciones })
-      .eq('id', habitante.id)
-      .eq('acuario_id', acuarioSeleccionado.id)
+      .from('habitante_anotaciones')
+      .insert([{ acuario_id: acuarioSeleccionado.id, habitante_id: habitanteAnotaciones.id, usuario_id: session.user.id, contenido }])
     if (error) setMensaje(`No se pudo guardar la anotación: ${error.message}`)
     else {
-      setVidaResumen((actual) => ({ ...actual, habitantes: actual.habitantes.map((item) => item.id === habitante.id ? { ...item, observaciones } : item) }))
-      setMensaje(`✅ Anotación de ${habitante.nombre_comun} guardada.`)
+      setNuevaAnotacion('')
+      await abrirAnotacionesHabitante(habitanteAnotaciones)
+      await cargarVidaResumen()
+      setMensaje(`✅ Anotación de ${habitanteAnotaciones.nombre_comun} guardada.`)
     }
     setGuardandoAnotacionId(null)
   }
@@ -3889,23 +3906,22 @@ function App() {
 
           {vidaResumen.habitantes.length > 0 && <div className="anotaciones-habitantes-inicio">
             <div className="anotaciones-habitantes-titulo">
-              <div><span>📝</span><div><h3>Anotaciones de habitantes</h3><p>Registra cambios de conducta, salud, alimentación u otras observaciones.</p></div></div>
+              <div><span>📝</span><div><h3>Anotaciones</h3><p>Toca un habitante para consultar su historial.</p></div></div>
               <button type="button" className="boton-claro" onClick={() => setSeccionActiva('habitantes')}>Ver todos</button>
             </div>
-            <div className="anotaciones-habitantes-lista">
-              {vidaResumen.habitantes.slice(0, 6).map((habitante) => <article className="anotacion-habitante" key={habitante.id}>
+            <div className="habitantes-compactos">
+              {vidaResumen.habitantes.slice(0, 8).map((habitante) => <button type="button" className="habitante-compacto" key={habitante.id} onClick={() => abrirAnotacionesHabitante(habitante)}>
                 <div className="anotacion-habitante-nombre"><span>🐟</span><div><strong>{habitante.nombre_comun}</strong><small>{Number(habitante.cantidad || 1)} en el acuario</small></div></div>
-                <textarea
-                  rows="2"
-                  maxLength="500"
-                  aria-label={`Anotación de ${habitante.nombre_comun}`}
-                  placeholder="Ej.: está comiendo menos, cambió de color…"
-                  value={anotacionesHabitantes[habitante.id] ?? ''}
-                  onChange={(e) => setAnotacionesHabitantes((actual) => ({ ...actual, [habitante.id]: e.target.value }))}
-                  readOnly={acuarioSeleccionado.rol_acceso === 'lector'}
-                />
-                {acuarioSeleccionado.rol_acceso !== 'lector' && <button type="button" className="boton-guardar-anotacion" disabled={guardandoAnotacionId === habitante.id} onClick={() => guardarAnotacionHabitante(habitante)}>{guardandoAnotacionId === habitante.id ? 'Guardando…' : 'Guardar'}</button>}
-              </article>)}
+                <span className={anotacionesResumen[habitante.id] ? 'badge-anotaciones tiene' : 'badge-anotaciones'}>{anotacionesResumen[habitante.id]?.cantidad || 0} nota(s) ›</span>
+              </button>)}
+            </div>
+          </div>}
+
+          {habitanteAnotaciones && <div className="modal-overlay" role="dialog" aria-modal="true" aria-label={`Anotaciones de ${habitanteAnotaciones.nombre_comun}`}>
+            <div className="modal-acuario modal-anotaciones-habitante">
+              <div className="modal-cabecera"><div><h2>🐟 {habitanteAnotaciones.nombre_comun}</h2><p>Historial de anotaciones</p></div><button className="boton-cerrar-modal" onClick={() => setHabitanteAnotaciones(null)}>×</button></div>
+              {acuarioSeleccionado.rol_acceso !== 'lector' && <div className="nueva-anotacion-habitante"><textarea rows="3" maxLength="500" value={nuevaAnotacion} onChange={(e) => setNuevaAnotacion(e.target.value)} placeholder="¿Qué observaste hoy?"/><button type="button" className="boton-principal" disabled={!nuevaAnotacion.trim() || guardandoAnotacionId === habitanteAnotaciones.id} onClick={guardarAnotacionHabitante}>{guardandoAnotacionId ? 'Guardando…' : 'Agregar anotación'}</button></div>}
+              <div className="historial-anotaciones-habitante">{historialAnotaciones.length === 0 ? <p className="chat-vacio">Todavía no hay anotaciones.</p> : historialAnotaciones.map((nota) => <article key={nota.id}><time>{new Date(nota.created_at).toLocaleString('es-EC', { dateStyle: 'medium', timeStyle: 'short' })}</time><p>{nota.contenido}</p></article>)}</div>
             </div>
           </div>}
         </section>
