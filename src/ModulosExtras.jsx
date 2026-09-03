@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { supabase } from './lib/supabase.js'
 import { subirImagenPublica } from './utilsImagenes.js'
 import GestionDatos from './GestionDatos.jsx'
@@ -1298,6 +1298,7 @@ function Colaboracion({ acuario, session, onMensaje, soloChat = false }) {
   const [permisoNotificaciones, setPermisoNotificaciones] = useState(
     'Notification' in window ? Notification.permission : 'unsupported'
   )
+  const finalChatRef = useRef(null)
   const esPropietario = acuario.usuario_id === session?.user?.id
 
   const cargar = async () => {
@@ -1336,6 +1337,11 @@ function Colaboracion({ acuario, session, onMensaje, soloChat = false }) {
       .subscribe()
     return () => { supabase.removeChannel(canal) }
   }, [acuario.id, basePreparada])
+
+  useEffect(() => {
+    if (!soloChat) return
+    finalChatRef.current?.scrollIntoView({ behavior: cargando ? 'auto' : 'smooth', block: 'end' })
+  }, [mensajes, cargando, soloChat])
 
   const invitar = async (e) => {
     e.preventDefault()
@@ -1412,7 +1418,7 @@ function Colaboracion({ acuario, session, onMensaje, soloChat = false }) {
   }
 
   return (
-    <div>
+    <div className={soloChat ? 'chat-modulo' : ''}>
       <Encabezado titulo={soloChat ? 'Mensajes del acuario' : 'Acceso compartido'} descripcion={soloChat ? 'Conversación temporal en tiempo real.' : 'Vincula cuentas y controla qué puede hacer cada persona.'} />
 
       {!basePreparada && <div className="aviso-configuracion-colaboracion">
@@ -1454,10 +1460,11 @@ function Colaboracion({ acuario, session, onMensaje, soloChat = false }) {
                 <small>{new Date(mensaje.created_at).toLocaleString('es-EC', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</small>
               </article>
             ))}
+            <div ref={finalChatRef} aria-hidden="true" />
           </div>
           <form className="chat-form" onSubmit={enviar}>
-            <textarea maxLength="300" rows="2" value={texto} onChange={(e) => setTexto(e.target.value)} placeholder="Escribe una indicación breve…" />
-            <button className="boton-principal" disabled={guardando || !texto.trim()}>Enviar</button>
+            <textarea maxLength="300" rows="1" value={texto} onChange={(e) => setTexto(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); e.currentTarget.form?.requestSubmit() } }} placeholder="Escribe un mensaje…" aria-label="Mensaje" />
+            <button className="boton-principal boton-enviar-chat" disabled={guardando || !texto.trim()} aria-label="Enviar mensaje">{guardando ? '…' : '➤'}</button>
           </form>
           <small className="chat-limite">{texto.length}/300 · caduca en 7 días</small>
         </section>}

@@ -2899,9 +2899,9 @@ html.nexoweb-oscuro .vida-especies > em { background: #26333c; border-color: #36
 .boton-notificaciones-chat { flex: 0 0 auto; min-height: 36px; padding: 7px 10px; border: 1px solid #b7e5dd; border-radius: 10px; background: #effbf8; color: #087f6b; font-size: 10px; font-weight: 800; }
 .boton-notificaciones-chat.activo { border-color: #98d6cb; background: #dff5f0; }
 .chat-lista { min-height: 240px; max-height: 420px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding: 14px 2px; }
-.chat-pantalla { max-width: 780px; margin: 0 auto; }
-.chat-acuario-independiente { display: flex; flex-direction: column; min-height: min(680px, calc(100vh - 235px)); padding-bottom: 14px; background: linear-gradient(rgba(232,244,240,.72), rgba(244,248,251,.9)); }
-.chat-acuario-independiente .chat-lista { flex: 1; max-height: none; min-height: 320px; padding: 16px 4px; }
+.chat-pantalla { width: 100%; max-width: 780px; height: calc(100dvh - 245px); min-height: 420px; margin: 0 auto; }
+.chat-acuario-independiente { display: flex; flex-direction: column; height: 100%; min-height: 0; padding-bottom: 10px; overflow: hidden; background: linear-gradient(rgba(232,244,240,.72), rgba(244,248,251,.9)); }
+.chat-acuario-independiente .chat-lista { flex: 1 1 auto; max-height: none; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 16px 4px; scroll-behavior: smooth; }
 .chat-acuario-independiente .chat-mensaje { box-shadow: 0 2px 7px rgba(16,24,40,.06); }
 .chat-vacio { margin: auto; color: #667085; font-size: 12px; }
 .chat-mensaje { align-self: flex-start; max-width: 82%; padding: 9px 11px; border-radius: 5px 14px 14px; background: #f2f4f7; }
@@ -2909,8 +2909,9 @@ html.nexoweb-oscuro .vida-especies > em { background: #26333c; border-color: #36
 .chat-mensaje strong { display: block; color: #087f6b; font-size: 9px; }
 .chat-mensaje p { margin: 3px 0; color: #17212b; font-size: 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
 .chat-mensaje small { color: #667085; font-size: 8px; }
-.chat-form { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
-.chat-form textarea { width: 100%; resize: none; padding: 11px; border: 1px solid #d0d5dd; border-radius: 12px; }
+.chat-form { flex: 0 0 auto; display: grid; grid-template-columns: minmax(0, 1fr) 46px; align-items: end; gap: 8px; padding-top: 8px; border-top: 1px solid rgba(208,213,221,.8); background: inherit; }
+.chat-form textarea { width: 100%; min-height: 46px; max-height: 110px; resize: none; padding: 12px 14px; border: 1px solid #d0d5dd; border-radius: 23px; }
+.chat-form .boton-enviar-chat { display: grid; place-items: center; width: 46px; min-width: 46px; height: 46px; min-height: 46px; padding: 0; border-radius: 50%; font-size: 20px; }
 .chat-limite { display: block; margin-top: 5px; color: #667085; text-align: right; font-size: 9px; }
 .boton-chat-flotante { position: fixed; right: 22px; bottom: 22px; z-index: 1150; display: grid; place-items: center; width: 56px; height: 56px; border: 0; border-radius: 50%; background: #087f6b; color: #fff; box-shadow: 0 12px 30px rgba(8,127,107,.32); font-size: 25px; }
 .boton-chat-flotante strong { position: absolute; top: -3px; right: -3px; display: grid; place-items: center; min-width: 21px; height: 21px; padding: 0 5px; border: 2px solid #fff; border-radius: 20px; background: #f04438; color: #fff; font-size: 9px; }
@@ -3395,10 +3396,12 @@ html.nexoweb-oscuro .resumen-costos {
   .vida-card { padding: 14px; }
   .colaboracion-grid { grid-template-columns: 1fr; }
   .chat-lista { min-height: 190px; max-height: 330px; }
-  .chat-acuario-independiente { min-height: calc(100vh - 245px); margin: 0 -5px; border-radius: 17px; }
-  .chat-acuario-independiente .chat-lista { min-height: 300px; }
-  .chat-form { grid-template-columns: 1fr; }
-  .chat-form .boton-principal { width: 100%; }
+  .chat-modulo > .cabecera-modulo { margin-bottom: 10px; }
+  .chat-pantalla { height: calc(100dvh - 225px); min-height: 350px; }
+  .chat-acuario-independiente { margin: 0 -5px; border-radius: 17px; }
+  .chat-acuario-independiente .chat-lista { min-height: 0; }
+  .chat-form { grid-template-columns: minmax(0, 1fr) 46px; padding-bottom: max(2px, env(safe-area-inset-bottom)); }
+  .chat-form .boton-principal { width: 46px; }
   .boton-chat-flotante { right: 16px; bottom: 84px; width: 52px; height: 52px; font-size: 22px; }
   .miembro-card { align-items: center; flex-direction: row; }
   .miembro-acciones { flex: 0 0 auto; width: auto; }
