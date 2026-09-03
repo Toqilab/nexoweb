@@ -12,7 +12,7 @@ const SelectorRegistroActividades = lazy(() =>
   import('./ActividadesFinal.jsx').then((modulo) => ({ default: modulo.SelectorRegistroActividades }))
 )
 
-const NEXOWEB_VERSION = '2.2.3'
+const NEXOWEB_VERSION = '2.2.4'
 
 const portadaDefaultAcuario = (tipo = '') => {
   const valor = String(tipo || '').toLowerCase()
@@ -168,6 +168,8 @@ function App() {
   const [tareasVencidas, setTareasVencidas] = useState([])
   const [cargandoTareas, setCargandoTareas] = useState(false)
   const [vidaResumen, setVidaResumen] = useState({ habitantes: [], plantas: [], cargando: false })
+  const [anotacionesHabitantes, setAnotacionesHabitantes] = useState({})
+  const [guardandoAnotacionId, setGuardandoAnotacionId] = useState(null)
 
   /* =========================================================
      PRODUCTOS
@@ -3670,11 +3672,30 @@ function App() {
       supabase.from('plantas').select('*').eq('acuario_id', acuarioSeleccionado.id).or('estado.is.null,estado.neq.baja').order('created_at', { ascending: false }),
     ])
 
+    const habitantesActuales = habitantes.data ?? []
     setVidaResumen({
-      habitantes: habitantes.data ?? [],
+      habitantes: habitantesActuales,
       plantas: plantas.data ?? [],
       cargando: false,
     })
+    setAnotacionesHabitantes(Object.fromEntries(habitantesActuales.map((item) => [item.id, item.observaciones ?? ''])))
+  }
+
+  const guardarAnotacionHabitante = async (habitante) => {
+    if (acuarioSeleccionado?.rol_acceso === 'lector') return
+    setGuardandoAnotacionId(habitante.id)
+    const observaciones = (anotacionesHabitantes[habitante.id] || '').trim() || null
+    const { error } = await supabase
+      .from('habitantes')
+      .update({ observaciones })
+      .eq('id', habitante.id)
+      .eq('acuario_id', acuarioSeleccionado.id)
+    if (error) setMensaje(`No se pudo guardar la anotación: ${error.message}`)
+    else {
+      setVidaResumen((actual) => ({ ...actual, habitantes: actual.habitantes.map((item) => item.id === habitante.id ? { ...item, observaciones } : item) }))
+      setMensaje(`✅ Anotación de ${habitante.nombre_comun} guardada.`)
+    }
+    setGuardandoAnotacionId(null)
   }
 
   const revisarMensajesNuevos = async () => {
@@ -3865,6 +3886,28 @@ function App() {
               </button>
             ))}
           </div>
+
+          {vidaResumen.habitantes.length > 0 && <div className="anotaciones-habitantes-inicio">
+            <div className="anotaciones-habitantes-titulo">
+              <div><span>📝</span><div><h3>Anotaciones de habitantes</h3><p>Registra cambios de conducta, salud, alimentación u otras observaciones.</p></div></div>
+              <button type="button" className="boton-claro" onClick={() => setSeccionActiva('habitantes')}>Ver todos</button>
+            </div>
+            <div className="anotaciones-habitantes-lista">
+              {vidaResumen.habitantes.slice(0, 6).map((habitante) => <article className="anotacion-habitante" key={habitante.id}>
+                <div className="anotacion-habitante-nombre"><span>🐟</span><div><strong>{habitante.nombre_comun}</strong><small>{Number(habitante.cantidad || 1)} en el acuario</small></div></div>
+                <textarea
+                  rows="2"
+                  maxLength="500"
+                  aria-label={`Anotación de ${habitante.nombre_comun}`}
+                  placeholder="Ej.: está comiendo menos, cambió de color…"
+                  value={anotacionesHabitantes[habitante.id] ?? ''}
+                  onChange={(e) => setAnotacionesHabitantes((actual) => ({ ...actual, [habitante.id]: e.target.value }))}
+                  readOnly={acuarioSeleccionado.rol_acceso === 'lector'}
+                />
+                {acuarioSeleccionado.rol_acceso !== 'lector' && <button type="button" className="boton-guardar-anotacion" disabled={guardandoAnotacionId === habitante.id} onClick={() => guardarAnotacionHabitante(habitante)}>{guardandoAnotacionId === habitante.id ? 'Guardando…' : 'Guardar'}</button>}
+              </article>)}
+            </div>
+          </div>}
         </section>
 
         <section className="seccion-hoy">
