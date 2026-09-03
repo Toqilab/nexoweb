@@ -12,7 +12,7 @@ const SelectorRegistroActividades = lazy(() =>
   import('./ActividadesFinal.jsx').then((modulo) => ({ default: modulo.SelectorRegistroActividades }))
 )
 
-const NEXOWEB_VERSION = '2.2.0'
+const NEXOWEB_VERSION = '2.2.1'
 
 const portadaDefaultAcuario = (tipo = '') => {
   const valor = String(tipo || '').toLowerCase()
@@ -3698,10 +3698,11 @@ function App() {
       localStorage.setItem(claveAviso, new Date().toISOString())
       const registro = await navigator.serviceWorker?.ready
       registro?.showNotification?.('Nuevo mensaje sobre tu acuario', {
-        body: `${ultimo.autor_email}: ${ultimo.contenido}`,
+        body: ultimo.contenido,
         icon: '/icons/nexoweb-192.png',
         badge: '/icons/nexoweb-192.png',
-        tag: `mensaje-${ultimo.id}`,
+        tag: `mensaje-${ultimo.id}`, renotify: true, silent: false,
+        vibrate: [180, 80, 180],
         data: { url: '/' },
       })
     }
@@ -4114,13 +4115,14 @@ function App() {
       }, async ({ new: nuevo }) => {
         if (nuevo.usuario_id === session?.user?.id) return
         setMensajesNoLeidos((cantidad) => cantidad + 1)
-        setMensaje(`💬 Nuevo mensaje de ${nuevo.autor_email}.`)
+        setMensaje('💬 Llegó un nuevo mensaje del acuario.')
         if ('Notification' in window && Notification.permission === 'granted') {
           const registro = await navigator.serviceWorker?.ready
           registro?.showNotification?.('Nuevo mensaje sobre tu acuario', {
-            body: `${nuevo.autor_email}: ${nuevo.contenido}`,
+            body: nuevo.contenido,
             icon: '/icons/nexoweb-192.png', badge: '/icons/nexoweb-192.png',
-            tag: `mensaje-${nuevo.id}`, data: { url: '/' },
+            tag: `mensaje-${nuevo.id}`, renotify: true, silent: false,
+            vibrate: [180, 80, 180], data: { url: '/' },
           })
         }
       })

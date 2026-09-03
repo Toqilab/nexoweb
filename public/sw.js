@@ -1,4 +1,4 @@
-const CACHE_NAME = 'nexoweb-v2.2.0'
+const CACHE_NAME = 'nexoweb-v2.2.1'
 const APP_SHELL = ['/', '/index.html', '/manifest.webmanifest', '/icons/nexoweb-192.png', '/icons/nexoweb-512.png']
 
 self.addEventListener('install', (event) => {
@@ -65,6 +65,9 @@ self.addEventListener('push', (event) => {
       icon: '/icons/nexoweb-192.png',
       badge: '/icons/nexoweb-192.png',
       tag: aviso.tag || 'nexoweb-recordatorio',
+      renotify: true,
+      silent: false,
+      vibrate: [180, 80, 180],
       data: { url: aviso.url || '/' },
     })
   )

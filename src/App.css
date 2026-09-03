@@ -2881,10 +2881,14 @@ html.nexoweb-oscuro .vida-especies > em { background: #26333c; border-color: #36
 .aviso-configuracion-colaboracion p { margin: 6px 0 12px; color: #7a2e0e; font-size: 12px; line-height: 1.5; }
 .aviso-configuracion-colaboracion code { font-weight: 800; }
 .texto-secundario { color: #667085; font-size: 12px; line-height: 1.5; }
-.miembro-card { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 11px; margin-top: 9px; border: 1px solid #eaecf0; border-radius: 12px; background: #f8fafb; }
+.miembro-card { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px; margin-top: 7px; border: 1px solid #eaecf0; border-radius: 11px; background: #f8fafb; }
 .miembro-card strong, .miembro-card small { display: block; overflow-wrap: anywhere; }
 .miembro-card small { margin-top: 3px; color: #667085; font-size: 10px; }
 .miembro-card.propietario { border-color: #b7e5dd; background: #effbf8; }
+.miembro-identidad { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.miembro-identidad > span { flex: 0 0 auto; display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: #dff5f0; font-size: 15px; }
+.miembro-identidad > div { min-width: 0; }
+.miembro-identidad strong { overflow: hidden; color: #17212b; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
 .miembro-acciones { display: flex; align-items: center; gap: 7px; }
 .miembro-acciones select { min-height: 38px; max-width: 145px; padding: 7px; border: 1px solid #d0d5dd; border-radius: 9px; background: #fff; }
 .invitar-form { margin-top: 18px; padding-top: 16px; border-top: 1px solid #eaecf0; }
@@ -2892,6 +2896,8 @@ html.nexoweb-oscuro .vida-especies > em { background: #26333c; border-color: #36
 .chat-cabecera { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
 .chat-cabecera h3 { margin: 0 0 4px; }
 .chat-cabecera p { margin: 0; color: #667085; font-size: 11px; }
+.boton-notificaciones-chat { flex: 0 0 auto; min-height: 36px; padding: 7px 10px; border: 1px solid #b7e5dd; border-radius: 10px; background: #effbf8; color: #087f6b; font-size: 10px; font-weight: 800; }
+.boton-notificaciones-chat.activo { border-color: #98d6cb; background: #dff5f0; }
 .chat-lista { min-height: 240px; max-height: 420px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding: 14px 2px; }
 .chat-pantalla { max-width: 780px; margin: 0 auto; }
 .chat-acuario-independiente { display: flex; flex-direction: column; min-height: min(680px, calc(100vh - 235px)); padding-bottom: 14px; background: linear-gradient(rgba(232,244,240,.72), rgba(244,248,251,.9)); }
@@ -2921,6 +2927,8 @@ html.nexoweb-oscuro .vida-especies > em { background: #26333c; border-color: #36
 .solo-lectura .boton-eliminar-entidad,
 .solo-lectura .boton-programar-hoy { display: none !important; }
 html.nexoweb-oscuro .miembro-card, html.nexoweb-oscuro .chat-mensaje { background: #26313a; border-color: #3a4650; }
+html.nexoweb-oscuro .miembro-identidad strong { color: #f5f7fa; }
+html.nexoweb-oscuro .boton-notificaciones-chat { background: #17463f; color: #d6fff7; }
 html.nexoweb-oscuro .chat-mensaje.propio { background: #17463f; }
 html.nexoweb-oscuro .chat-mensaje p { color: #f5f7fa; }
 
@@ -3392,8 +3400,8 @@ html.nexoweb-oscuro .resumen-costos {
   .chat-form { grid-template-columns: 1fr; }
   .chat-form .boton-principal { width: 100%; }
   .boton-chat-flotante { right: 16px; bottom: 84px; width: 52px; height: 52px; font-size: 22px; }
-  .miembro-card { align-items: flex-start; flex-direction: column; }
-  .miembro-acciones { width: 100%; }
+  .miembro-card { align-items: center; flex-direction: row; }
+  .miembro-acciones { flex: 0 0 auto; width: auto; }
   .miembro-acciones select { flex: 1; max-width: none; }
 }
 

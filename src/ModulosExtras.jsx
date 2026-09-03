@@ -1295,6 +1295,9 @@ function Colaboracion({ acuario, session, onMensaje, soloChat = false }) {
   const [cargando, setCargando] = useState(true)
   const [guardando, setGuardando] = useState(false)
   const [basePreparada, setBasePreparada] = useState(true)
+  const [permisoNotificaciones, setPermisoNotificaciones] = useState(
+    'Notification' in window ? Notification.permission : 'unsupported'
+  )
   const esPropietario = acuario.usuario_id === session?.user?.id
 
   const cargar = async () => {
@@ -1371,6 +1374,27 @@ function Colaboracion({ acuario, session, onMensaje, soloChat = false }) {
     }
   }
 
+  const activarNotificaciones = async () => {
+    if (!('Notification' in window)) {
+      onMensaje('Este dispositivo no admite notificaciones web.')
+      return
+    }
+    const permiso = await Notification.requestPermission()
+    setPermisoNotificaciones(permiso)
+    if (permiso !== 'granted') {
+      onMensaje('Android no concedió el permiso. Revisa Ajustes → Aplicaciones → NexoWeb/Chrome → Notificaciones.')
+      return
+    }
+    const registro = await navigator.serviceWorker?.ready
+    await registro?.showNotification?.('Notificaciones de NexoWeb activadas', {
+      body: 'Los mensajes nuevos aparecerán aquí mientras la PWA esté activa.',
+      icon: '/icons/nexoweb-192.png', badge: '/icons/nexoweb-192.png',
+      tag: 'nexoweb-prueba-chat', renotify: true, silent: false,
+      vibrate: [180, 80, 180], data: { url: '/' },
+    })
+    onMensaje('✅ Notificación de prueba enviada.')
+  }
+
   const enviar = async (e) => {
     e.preventDefault()
     const contenido = texto.trim()
@@ -1405,7 +1429,7 @@ function Colaboracion({ acuario, session, onMensaje, soloChat = false }) {
 
           {miembros.filter((miembro) => esPropietario || miembro.usuario_id !== session?.user?.id).map((miembro) => (
             <article className="miembro-card" key={miembro.id}>
-              <div><strong>{miembro.email}</strong><small>{miembro.rol === 'editor' ? 'Puede ver y registrar información' : 'Solo puede consultar'}</small></div>
+              <div className="miembro-identidad"><span>👤</span><div><strong>{miembro.email}</strong><small>{miembro.rol === 'editor' ? 'Colaborador' : 'Solo lectura'}</small></div></div>
               {esPropietario && <div className="miembro-acciones">
                 <select aria-label={`Permiso de ${miembro.email}`} value={miembro.rol} onChange={(e) => cambiarRol(miembro, e.target.value)}><option value="lector">Solo lectura</option><option value="editor">Colaborador</option></select>
                 <button type="button" className="boton-eliminar-entidad" onClick={() => quitar(miembro)}>Quitar</button>
@@ -1421,11 +1445,11 @@ function Colaboracion({ acuario, session, onMensaje, soloChat = false }) {
         </section>}
 
         {soloChat && <section className="panel-config chat-acuario chat-acuario-independiente">
-          <div className="chat-cabecera"><div><h3>💬 Chat</h3><p>Mensajes en tiempo real · se eliminan después de 7 días.</p></div><button type="button" className="boton-claro" onClick={cargar}>Actualizar</button></div>
+          <div className="chat-cabecera"><div><h3>💬 Chat</h3><p>En tiempo real · los mensajes se eliminan después de 7 días.</p></div><button type="button" className={permisoNotificaciones === 'granted' ? 'boton-notificaciones-chat activo' : 'boton-notificaciones-chat'} onClick={activarNotificaciones}>{permisoNotificaciones === 'granted' ? '🔔 Activas' : '🔕 Activar avisos'}</button></div>
           <div className="chat-lista">
             {cargando ? <p>Cargando…</p> : mensajes.length === 0 ? <div className="chat-vacio">No hay mensajes recientes.</div> : mensajes.map((mensaje) => (
               <article className={`chat-mensaje ${mensaje.usuario_id === session?.user?.id ? 'propio' : ''}`} key={mensaje.id}>
-                <strong>{mensaje.autor_email === session?.user?.email ? 'Tú' : mensaje.autor_email}</strong>
+                <strong>{mensaje.usuario_id === session?.user?.id ? 'Tú' : mensaje.usuario_id === acuario.usuario_id ? 'Dueño' : 'Colaborador'}</strong>
                 <p>{mensaje.contenido}</p>
                 <small>{new Date(mensaje.created_at).toLocaleString('es-EC', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</small>
               </article>
