@@ -48,7 +48,7 @@ function Encabezado({ titulo, descripcion, boton, onBoton }) {
         <h2>{titulo}</h2>
         <p>{descripcion}</p>
       </div>
-      <button className="boton-principal" onClick={onBoton}>{boton}</button>
+      <button type="button" className="boton-principal" onClick={() => onBoton?.()}>{boton}</button>
     </div>
   )
 }

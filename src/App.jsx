@@ -12,7 +12,7 @@ const SelectorRegistroActividades = lazy(() =>
   import('./ActividadesFinal.jsx').then((modulo) => ({ default: modulo.SelectorRegistroActividades }))
 )
 
-const NEXOWEB_VERSION = '1.8.2'
+const NEXOWEB_VERSION = '1.8.3'
 
 const portadaDefaultAcuario = (tipo = '') => {
   const valor = String(tipo || '').toLowerCase()
