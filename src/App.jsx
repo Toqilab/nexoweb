@@ -12,7 +12,7 @@ const SelectorRegistroActividades = lazy(() =>
   import('./ActividadesFinal.jsx').then((modulo) => ({ default: modulo.SelectorRegistroActividades }))
 )
 
-const NEXOWEB_VERSION = '2.1.0'
+const NEXOWEB_VERSION = '2.2.0'
 
 const portadaDefaultAcuario = (tipo = '') => {
   const valor = String(tipo || '').toLowerCase()
@@ -3710,7 +3710,7 @@ function App() {
   const abrirMensajes = () => {
     if (acuarioSeleccionado?.id) localStorage.setItem(`nexoweb-mensajes-vistos-${acuarioSeleccionado.id}`, new Date().toISOString())
     setMensajesNoLeidos(0)
-    setSeccionActiva('colaboracion')
+    setSeccionActiva('mensajes')
   }
 
   const renderResumen = () => {
@@ -4048,7 +4048,7 @@ function App() {
         { id: 'alimentacion', nombre: 'Alimentación', icono: '🍽️' },
         { id: 'notas', nombre: 'Notas', icono: '📝' },
         { id: 'fotos', nombre: 'Fotos', icono: '📷' },
-        { id: 'colaboracion', nombre: 'Compartir y mensajes', icono: '👥' },
+        { id: 'colaboracion', nombre: 'Acceso compartido', icono: '👥' },
       ],
     },
     {
@@ -4184,7 +4184,7 @@ function App() {
     }
 
     if (
-      ['habitantes', 'plantas', 'alimentacion', 'equipos', 'iluminacion', 'notas', 'fotos', 'colaboracion', 'ajustes']
+      ['habitantes', 'plantas', 'alimentacion', 'equipos', 'iluminacion', 'notas', 'fotos', 'colaboracion', 'mensajes', 'ajustes']
         .includes(seccionActiva)
     ) {
       return (

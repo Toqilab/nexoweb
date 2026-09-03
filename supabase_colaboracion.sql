@@ -22,6 +22,9 @@ create table if not exists public.mensajes_acuario (
   expires_at timestamptz not null default (now() + interval '7 days')
 );
 
+alter table public.mensajes_acuario
+  alter column expires_at set default (now() + interval '7 days');
+
 create index if not exists acuario_miembros_usuario_idx on public.acuario_miembros(usuario_id);
 create index if not exists mensajes_acuario_activos_idx on public.mensajes_acuario(acuario_id, expires_at);
 alter table public.acuario_miembros enable row level security;
@@ -83,7 +86,9 @@ begin
   if not exists(select 1 from pg_policies where schemaname='public' and tablename='acuario_miembros' and policyname='miembros_quitar') then create policy miembros_quitar on public.acuario_miembros for delete using(exists(select 1 from public.acuarios a where a.id=acuario_id and a.usuario_id=auth.uid())); end if;
   if not exists(select 1 from pg_policies where schemaname='public' and tablename='acuario_miembros' and policyname='miembros_cambiar_rol') then create policy miembros_cambiar_rol on public.acuario_miembros for update using(exists(select 1 from public.acuarios a where a.id=acuario_id and a.usuario_id=auth.uid())) with check(exists(select 1 from public.acuarios a where a.id=acuario_id and a.usuario_id=auth.uid())); end if;
   if not exists(select 1 from pg_policies where schemaname='public' and tablename='mensajes_acuario' and policyname='mensajes_ver') then create policy mensajes_ver on public.mensajes_acuario for select using(public.puede_ver_acuario(acuario_id) and expires_at>now()); end if;
-  if not exists(select 1 from pg_policies where schemaname='public' and tablename='mensajes_acuario' and policyname='mensajes_enviar') then create policy mensajes_enviar on public.mensajes_acuario for insert with check(public.puede_ver_acuario(acuario_id) and usuario_id=auth.uid() and expires_at<=now()+interval '7 days'); end if;
+  drop policy if exists mensajes_enviar on public.mensajes_acuario;
+  create policy mensajes_enviar on public.mensajes_acuario for insert
+    with check(public.puede_ver_acuario(acuario_id) and usuario_id=auth.uid() and lower(autor_email)=lower(coalesce(auth.jwt()->>'email','')) and expires_at<=now()+interval '8 days');
 end $$;
 
 do $$ begin

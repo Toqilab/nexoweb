@@ -1286,7 +1286,7 @@ function Fotos({ acuario, session, onMensaje }) {
   )
 }
 
-function Colaboracion({ acuario, session, onMensaje }) {
+function Colaboracion({ acuario, session, onMensaje, soloChat = false }) {
   const [miembros, setMiembros] = useState([])
   const [mensajes, setMensajes] = useState([])
   const [email, setEmail] = useState('')
@@ -1381,7 +1381,6 @@ function Colaboracion({ acuario, session, onMensaje }) {
       usuario_id: session.user.id,
       autor_email: session.user.email,
       contenido,
-      expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
     }])
     if (error) onMensaje(`No se pudo enviar: ${error.message}`)
     else { setTexto(''); await cargar() }
@@ -1390,7 +1389,7 @@ function Colaboracion({ acuario, session, onMensaje }) {
 
   return (
     <div>
-      <Encabezado titulo="Compartir y mensajes" descripcion="Vincula cuentas y coordina el cuidado del acuario." />
+      <Encabezado titulo={soloChat ? 'Mensajes del acuario' : 'Acceso compartido'} descripcion={soloChat ? 'Conversación temporal en tiempo real.' : 'Vincula cuentas y controla qué puede hacer cada persona.'} />
 
       {!basePreparada && <div className="aviso-configuracion-colaboracion">
         <strong>⚙️ Falta preparar Supabase</strong>
@@ -1398,13 +1397,13 @@ function Colaboracion({ acuario, session, onMensaje }) {
         <button type="button" className="boton-claro" onClick={cargar}>Comprobar nuevamente</button>
       </div>}
 
-      {basePreparada && <div className="colaboracion-grid">
-        <section className="panel-config">
+      {basePreparada && <div className={soloChat ? 'chat-pantalla' : 'colaboracion-grid'}>
+        {!soloChat && <section className="panel-config">
           <h3>👥 Acceso compartido</h3>
           <p className="texto-secundario">El dueño conserva el control. La otra persona debe crear primero una cuenta en NexoWeb.</p>
-          <article className="miembro-card propietario"><div><strong>{session?.user?.email}</strong><small>{esPropietario ? 'Propietario de este acuario' : `Tu acceso: ${acuario.rol_acceso || 'compartido'}`}</small></div></article>
+          <article className="miembro-card propietario"><div><strong>{esPropietario ? session?.user?.email : 'Dueño del acuario'}</strong><small>{esPropietario ? 'Propietario de este acuario' : `Tu acceso: ${acuario.rol_acceso || 'compartido'}`}</small></div></article>
 
-          {miembros.map((miembro) => (
+          {miembros.filter((miembro) => esPropietario || miembro.usuario_id !== session?.user?.id).map((miembro) => (
             <article className="miembro-card" key={miembro.id}>
               <div><strong>{miembro.email}</strong><small>{miembro.rol === 'editor' ? 'Puede ver y registrar información' : 'Solo puede consultar'}</small></div>
               {esPropietario && <div className="miembro-acciones">
@@ -1419,10 +1418,10 @@ function Colaboracion({ acuario, session, onMensaje }) {
             <div className="campo-formulario"><label>Permiso</label><select value={rol} onChange={(e) => setRol(e.target.value)}><option value="lector">Solo lectura</option><option value="editor">Colaborador</option></select></div>
             <button className="boton-principal" disabled={guardando}>{guardando ? 'Vinculando…' : 'Vincular cuenta'}</button>
           </form>}
-        </section>
+        </section>}
 
-        <section className="panel-config chat-acuario">
-          <div className="chat-cabecera"><div><h3>💬 Mensajes temporales</h3><p>Se eliminan automáticamente después de 7 días. Las Notas permanecen guardadas.</p></div><button type="button" className="boton-claro" onClick={cargar}>Actualizar</button></div>
+        {soloChat && <section className="panel-config chat-acuario chat-acuario-independiente">
+          <div className="chat-cabecera"><div><h3>💬 Chat</h3><p>Mensajes en tiempo real · se eliminan después de 7 días.</p></div><button type="button" className="boton-claro" onClick={cargar}>Actualizar</button></div>
           <div className="chat-lista">
             {cargando ? <p>Cargando…</p> : mensajes.length === 0 ? <div className="chat-vacio">No hay mensajes recientes.</div> : mensajes.map((mensaje) => (
               <article className={`chat-mensaje ${mensaje.usuario_id === session?.user?.id ? 'propio' : ''}`} key={mensaje.id}>
@@ -1437,7 +1436,7 @@ function Colaboracion({ acuario, session, onMensaje }) {
             <button className="boton-principal" disabled={guardando || !texto.trim()}>Enviar</button>
           </form>
           <small className="chat-limite">{texto.length}/300 · caduca en 7 días</small>
-        </section>
+        </section>}
       </div>}
     </div>
   )
@@ -1454,6 +1453,7 @@ export default function ModulosExtras({ seccion, acuario, session, onMensaje, on
   if (seccion === 'notas') return <Notas acuario={acuario} onMensaje={onMensaje} onHistorialCambiado={onHistorialCambiado} />
   if (seccion === 'fotos') return <Fotos acuario={acuario} session={session} onMensaje={onMensaje} />
   if (seccion === 'colaboracion') return <Colaboracion acuario={acuario} session={session} onMensaje={onMensaje} />
+  if (seccion === 'mensajes') return <Colaboracion acuario={acuario} session={session} onMensaje={onMensaje} soloChat />
   if (seccion === 'ajustes') return <GestionDatos acuario={acuario} session={session} onMensaje={onMensaje} />
 
   return null
