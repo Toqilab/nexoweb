@@ -1,11 +1,12 @@
 {
   "name": "NexoWeb",
+  "id": "/",
   "short_name": "NexoWeb",
   "description": "Gestión y cuidado de acuarios y estanques",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#f4f8fb",
+  "background_color": "#17212b",
   "theme_color": "#17212b",
   "lang": "es",
   "orientation": "portrait-primary",

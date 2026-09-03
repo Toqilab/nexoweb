@@ -2875,6 +2875,31 @@ html.nexoweb-oscuro .vida-especies > em { background: #26333c; border-color: #36
   font-size: 10px;
 }
 
+.colaboracion-grid { display: grid; grid-template-columns: minmax(0, .85fr) minmax(0, 1.15fr); gap: 15px; }
+.texto-secundario { color: #667085; font-size: 12px; line-height: 1.5; }
+.miembro-card { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 11px; margin-top: 9px; border: 1px solid #eaecf0; border-radius: 12px; background: #f8fafb; }
+.miembro-card strong, .miembro-card small { display: block; overflow-wrap: anywhere; }
+.miembro-card small { margin-top: 3px; color: #667085; font-size: 10px; }
+.miembro-card.propietario { border-color: #b7e5dd; background: #effbf8; }
+.invitar-form { margin-top: 18px; padding-top: 16px; border-top: 1px solid #eaecf0; }
+.invitar-form .boton-principal { width: 100%; }
+.chat-cabecera { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.chat-cabecera h3 { margin: 0 0 4px; }
+.chat-cabecera p { margin: 0; color: #667085; font-size: 11px; }
+.chat-lista { min-height: 240px; max-height: 420px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding: 14px 2px; }
+.chat-vacio { margin: auto; color: #667085; font-size: 12px; }
+.chat-mensaje { align-self: flex-start; max-width: 82%; padding: 9px 11px; border-radius: 5px 14px 14px; background: #f2f4f7; }
+.chat-mensaje.propio { align-self: flex-end; border-radius: 14px 5px 14px 14px; background: #dcf7f1; }
+.chat-mensaje strong { display: block; color: #087f6b; font-size: 9px; }
+.chat-mensaje p { margin: 3px 0; color: #17212b; font-size: 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.chat-mensaje small { color: #667085; font-size: 8px; }
+.chat-form { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+.chat-form textarea { width: 100%; resize: none; padding: 11px; border: 1px solid #d0d5dd; border-radius: 12px; }
+.chat-limite { display: block; margin-top: 5px; color: #667085; text-align: right; font-size: 9px; }
+html.nexoweb-oscuro .miembro-card, html.nexoweb-oscuro .chat-mensaje { background: #26313a; border-color: #3a4650; }
+html.nexoweb-oscuro .chat-mensaje.propio { background: #17463f; }
+html.nexoweb-oscuro .chat-mensaje p { color: #f5f7fa; }
+
 .panel-config-lateral h3 {
   margin: 0 0 8px;
 }
@@ -3336,6 +3361,10 @@ html.nexoweb-oscuro .resumen-costos {
   .config-guardar .boton-principal { width: 100%; min-height: 48px; }
   .vida-inicio-grid { grid-template-columns: 1fr; }
   .vida-card { padding: 14px; }
+  .colaboracion-grid { grid-template-columns: 1fr; }
+  .chat-lista { min-height: 190px; max-height: 330px; }
+  .chat-form { grid-template-columns: 1fr; }
+  .chat-form .boton-principal { width: 100%; }
 }
 
 @media (max-width: 480px) {

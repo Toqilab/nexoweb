@@ -12,7 +12,7 @@ const SelectorRegistroActividades = lazy(() =>
   import('./ActividadesFinal.jsx').then((modulo) => ({ default: modulo.SelectorRegistroActividades }))
 )
 
-const NEXOWEB_VERSION = '1.9.0'
+const NEXOWEB_VERSION = '2.0.0'
 
 const portadaDefaultAcuario = (tipo = '') => {
   const valor = String(tipo || '').toLowerCase()
@@ -707,16 +707,28 @@ function App() {
 
     setCargandoAcuarios(true)
 
-    const { data, error } = await supabase
-      .from('acuarios')
-      .select('*')
+    const { data: membresias, error: errorMembresias } = await supabase
+      .from('acuario_miembros')
+      .select('acuario_id,rol')
       .eq('usuario_id', session.user.id)
-      .order('created_at', { ascending: false })
+
+    const roles = new Map((membresias ?? []).map((item) => [item.acuario_id, item.rol]))
+    const idsCompartidos = [...roles.keys()]
+    let consulta = supabase.from('acuarios').select('*')
+    if (!errorMembresias && idsCompartidos.length) {
+      consulta = consulta.or(`usuario_id.eq.${session.user.id},id.in.(${idsCompartidos.join(',')})`)
+    } else {
+      consulta = consulta.eq('usuario_id', session.user.id)
+    }
+    const { data, error } = await consulta.order('created_at', { ascending: false })
 
     if (error) {
       setMensaje(`Error: ${error.message}`)
     } else {
-      setAcuarios(data ?? [])
+      setAcuarios((data ?? []).map((item) => ({
+        ...item,
+        rol_acceso: item.usuario_id === session.user.id ? 'propietario' : roles.get(item.id) || 'lector',
+      })))
     }
 
     setCargandoAcuarios(false)
@@ -3998,6 +4010,7 @@ function App() {
         { id: 'alimentacion', nombre: 'Alimentación', icono: '🍽️' },
         { id: 'notas', nombre: 'Notas', icono: '📝' },
         { id: 'fotos', nombre: 'Fotos', icono: '📷' },
+        { id: 'colaboracion', nombre: 'Compartir y mensajes', icono: '👥' },
       ],
     },
     {
@@ -4104,7 +4117,7 @@ function App() {
     }
 
     if (
-      ['habitantes', 'plantas', 'alimentacion', 'equipos', 'iluminacion', 'notas', 'fotos', 'ajustes']
+      ['habitantes', 'plantas', 'alimentacion', 'equipos', 'iluminacion', 'notas', 'fotos', 'colaboracion', 'ajustes']
         .includes(seccionActiva)
     ) {
       return (

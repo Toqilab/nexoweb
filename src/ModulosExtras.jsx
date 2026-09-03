@@ -1286,6 +1286,120 @@ function Fotos({ acuario, session, onMensaje }) {
   )
 }
 
+function Colaboracion({ acuario, session, onMensaje }) {
+  const [miembros, setMiembros] = useState([])
+  const [mensajes, setMensajes] = useState([])
+  const [email, setEmail] = useState('')
+  const [rol, setRol] = useState('lector')
+  const [texto, setTexto] = useState('')
+  const [cargando, setCargando] = useState(true)
+  const [guardando, setGuardando] = useState(false)
+  const esPropietario = acuario.usuario_id === session?.user?.id
+
+  const cargar = async () => {
+    setCargando(true)
+    await supabase.rpc('limpiar_mensajes_vencidos')
+    const [respuestaMiembros, respuestaMensajes] = await Promise.all([
+      supabase.from('acuario_miembros').select('*').eq('acuario_id', acuario.id).order('created_at'),
+      supabase.from('mensajes_acuario').select('*').eq('acuario_id', acuario.id).gt('expires_at', new Date().toISOString()).order('created_at', { ascending: true }).limit(100),
+    ])
+    if (respuestaMiembros.error) onMensaje(`Error de miembros: ${respuestaMiembros.error.message}`)
+    else setMiembros(respuestaMiembros.data ?? [])
+    if (respuestaMensajes.error) onMensaje(`Error de mensajes: ${respuestaMensajes.error.message}`)
+    else setMensajes(respuestaMensajes.data ?? [])
+    setCargando(false)
+  }
+
+  useEffect(() => { cargar() }, [acuario.id])
+
+  const invitar = async (e) => {
+    e.preventDefault()
+    if (!email.trim()) return
+    setGuardando(true)
+    const { error } = await supabase.rpc('invitar_miembro_acuario', {
+      p_acuario_id: acuario.id,
+      p_email: email.trim().toLowerCase(),
+      p_rol: rol,
+    })
+    if (error) onMensaje(`No se pudo compartir: ${error.message}`)
+    else {
+      setEmail('')
+      await cargar()
+      onMensaje('✅ Cuenta vinculada al acuario.')
+    }
+    setGuardando(false)
+  }
+
+  const quitar = async (miembro) => {
+    if (!window.confirm(`¿Quitar el acceso de ${miembro.email}?`)) return
+    const { error } = await supabase.from('acuario_miembros').delete().eq('id', miembro.id)
+    if (error) onMensaje(`Error: ${error.message}`)
+    else { await cargar(); onMensaje('✅ Acceso retirado.') }
+  }
+
+  const enviar = async (e) => {
+    e.preventDefault()
+    const contenido = texto.trim()
+    if (!contenido) return
+    setGuardando(true)
+    const { error } = await supabase.from('mensajes_acuario').insert([{
+      acuario_id: acuario.id,
+      usuario_id: session.user.id,
+      autor_email: session.user.email,
+      contenido,
+      expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+    }])
+    if (error) onMensaje(`No se pudo enviar: ${error.message}`)
+    else { setTexto(''); await cargar() }
+    setGuardando(false)
+  }
+
+  return (
+    <div>
+      <Encabezado titulo="Compartir y mensajes" descripcion="Vincula cuentas y coordina el cuidado del acuario." />
+
+      <div className="colaboracion-grid">
+        <section className="panel-config">
+          <h3>👥 Acceso compartido</h3>
+          <p className="texto-secundario">El dueño conserva el control. La otra persona debe crear primero una cuenta en NexoWeb.</p>
+          <article className="miembro-card propietario"><div><strong>{session?.user?.email}</strong><small>{esPropietario ? 'Propietario de este acuario' : `Tu acceso: ${acuario.rol_acceso || 'compartido'}`}</small></div></article>
+
+          {miembros.map((miembro) => (
+            <article className="miembro-card" key={miembro.id}>
+              <div><strong>{miembro.email}</strong><small>{miembro.rol === 'editor' ? 'Puede ver y registrar información' : 'Solo puede consultar'}</small></div>
+              {esPropietario && <button type="button" className="boton-eliminar-entidad" onClick={() => quitar(miembro)}>Quitar</button>}
+            </article>
+          ))}
+
+          {esPropietario && <form className="invitar-form" onSubmit={invitar}>
+            <div className="campo-formulario"><label>Correo de la cuenta</label><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="persona@correo.com" required /></div>
+            <div className="campo-formulario"><label>Permiso</label><select value={rol} onChange={(e) => setRol(e.target.value)}><option value="lector">Solo lectura</option><option value="editor">Colaborador</option></select></div>
+            <button className="boton-principal" disabled={guardando}>{guardando ? 'Vinculando…' : 'Vincular cuenta'}</button>
+          </form>}
+        </section>
+
+        <section className="panel-config chat-acuario">
+          <div className="chat-cabecera"><div><h3>💬 Mensajes temporales</h3><p>Se eliminan automáticamente después de 7 días. Las Notas permanecen guardadas.</p></div><button type="button" className="boton-claro" onClick={cargar}>Actualizar</button></div>
+          <div className="chat-lista">
+            {cargando ? <p>Cargando…</p> : mensajes.length === 0 ? <div className="chat-vacio">No hay mensajes recientes.</div> : mensajes.map((mensaje) => (
+              <article className={`chat-mensaje ${mensaje.usuario_id === session?.user?.id ? 'propio' : ''}`} key={mensaje.id}>
+                <strong>{mensaje.autor_email === session?.user?.email ? 'Tú' : mensaje.autor_email}</strong>
+                <p>{mensaje.contenido}</p>
+                <small>{new Date(mensaje.created_at).toLocaleString('es-EC', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</small>
+              </article>
+            ))}
+          </div>
+          <form className="chat-form" onSubmit={enviar}>
+            <textarea maxLength="300" rows="2" value={texto} onChange={(e) => setTexto(e.target.value)} placeholder="Escribe una indicación breve…" />
+            <button className="boton-principal" disabled={guardando || !texto.trim()}>Enviar</button>
+          </form>
+          <small className="chat-limite">{texto.length}/300 · caduca en 7 días</small>
+        </section>
+      </div>
+    </div>
+  )
+}
+
 export default function ModulosExtras({ seccion, acuario, session, onMensaje, onHistorialCambiado }) {
   if (!acuario) return null
 
@@ -1296,6 +1410,7 @@ export default function ModulosExtras({ seccion, acuario, session, onMensaje, on
   if (seccion === 'iluminacion') return <Iluminacion acuario={acuario} onMensaje={onMensaje} />
   if (seccion === 'notas') return <Notas acuario={acuario} onMensaje={onMensaje} onHistorialCambiado={onHistorialCambiado} />
   if (seccion === 'fotos') return <Fotos acuario={acuario} session={session} onMensaje={onMensaje} />
+  if (seccion === 'colaboracion') return <Colaboracion acuario={acuario} session={session} onMensaje={onMensaje} />
   if (seccion === 'ajustes') return <GestionDatos acuario={acuario} session={session} onMensaje={onMensaje} />
 
   return null
