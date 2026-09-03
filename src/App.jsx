@@ -1,4 +1,4 @@
-import { lazy, useEffect, useMemo, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from './lib/supabase.js'
 import './App.css'
 import { subirImagenPublica, formatoBytes } from './utilsImagenes.js'
@@ -12,7 +12,7 @@ const SelectorRegistroActividades = lazy(() =>
   import('./ActividadesFinal.jsx').then((modulo) => ({ default: modulo.SelectorRegistroActividades }))
 )
 
-const NEXOWEB_VERSION = '2.2.2'
+const NEXOWEB_VERSION = '2.2.3'
 
 const portadaDefaultAcuario = (tipo = '') => {
   const valor = String(tipo || '').toLowerCase()
@@ -95,6 +95,7 @@ function App() {
   const [acuarioEliminarPendiente, setAcuarioEliminarPendiente] = useState(null)
   const [mostrarDetallesAcuario, setMostrarDetallesAcuario] = useState(false)
   const [mensajesNoLeidos, setMensajesNoLeidos] = useState(0)
+  const [chatAbierto, setChatAbierto] = useState(false)
   const [deferredInstallPrompt, setDeferredInstallPrompt] = useState(null)
   const [appInstalada, setAppInstalada] = useState(
     window.matchMedia?.('(display-mode: standalone)')?.matches ||
@@ -3711,7 +3712,7 @@ function App() {
   const abrirMensajes = () => {
     if (acuarioSeleccionado?.id) localStorage.setItem(`nexoweb-mensajes-vistos-${acuarioSeleccionado.id}`, new Date().toISOString())
     setMensajesNoLeidos(0)
-    setSeccionActiva('mensajes')
+    setChatAbierto(true)
   }
 
   const renderResumen = () => {
@@ -4556,10 +4557,25 @@ function App() {
           </main>
         </div>
 
-        <button type="button" className="boton-chat-flotante" onClick={abrirMensajes} aria-label="Abrir mensajes del acuario">
+        {!chatAbierto && <button type="button" className="boton-chat-flotante" onClick={abrirMensajes} aria-label="Abrir mensajes del acuario">
           <span>💬</span>
           {mensajesNoLeidos > 0 && <strong>{mensajesNoLeidos > 9 ? '9+' : mensajesNoLeidos}</strong>}
-        </button>
+        </button>}
+
+        {chatAbierto && <div className="chat-modal-overlay" role="dialog" aria-modal="true" aria-label="Mensajes del acuario">
+          <div className="chat-modal-contenedor">
+            <button type="button" className="chat-modal-cerrar" onClick={() => setChatAbierto(false)} aria-label="Cerrar mensajes">×</button>
+            <Suspense fallback={<div className="cargando-modulo">Cargando chat…</div>}>
+              <ModulosExtras
+                seccion="mensajes"
+                acuario={acuarioSeleccionado}
+                session={session}
+                onMensaje={setMensaje}
+                onHistorialCambiado={cargarHistorialGeneral}
+              />
+            </Suspense>
+          </div>
+        </div>}
 
         <nav className="bottom-nav">
           <button

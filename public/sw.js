@@ -1,4 +1,4 @@
-const CACHE_NAME = 'nexoweb-v2.2.2'
+const CACHE_NAME = 'nexoweb-v2.2.3'
 const APP_SHELL = ['/', '/index.html', '/manifest.webmanifest', '/icons/nexoweb-192.png', '/icons/nexoweb-512.png']
 
 self.addEventListener('install', (event) => {

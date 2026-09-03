@@ -2916,6 +2916,13 @@ html.nexoweb-oscuro .vida-especies > em { background: #26333c; border-color: #36
 .boton-chat-flotante { position: fixed; right: 22px; bottom: 22px; z-index: 1150; display: grid; place-items: center; width: 56px; height: 56px; border: 0; border-radius: 50%; background: #087f6b; color: #fff; box-shadow: 0 12px 30px rgba(8,127,107,.32); font-size: 25px; }
 .boton-chat-flotante strong { position: absolute; top: -3px; right: -3px; display: grid; place-items: center; min-width: 21px; height: 21px; padding: 0 5px; border: 2px solid #fff; border-radius: 20px; background: #f04438; color: #fff; font-size: 9px; }
 .boton-chat-flotante:hover { transform: translateY(-2px); }
+.chat-modal-overlay { position: fixed; inset: 0; z-index: 2000; display: grid; place-items: center; padding: 18px; background: rgba(16,24,40,.58); backdrop-filter: blur(5px); }
+.chat-modal-contenedor { position: relative; width: min(820px, 100%); height: min(780px, calc(100dvh - 36px)); min-height: 0; padding: 18px; overflow: hidden; border-radius: 22px; background: #f7f9fb; box-shadow: 0 24px 70px rgba(16,24,40,.3); }
+.chat-modal-cerrar { position: absolute; top: 13px; right: 13px; z-index: 5; display: grid; place-items: center; width: 38px; height: 38px; border: 0; border-radius: 50%; background: #17212b; color: #fff; font-size: 25px; line-height: 1; }
+.chat-modal-contenedor .chat-modulo { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+.chat-modal-contenedor .chat-modulo > .cabecera-modulo { flex: 0 0 auto; padding-right: 44px; }
+.chat-modal-contenedor .chat-pantalla { flex: 1 1 auto; height: auto; min-height: 0; }
+.chat-modal-contenedor .chat-acuario-independiente { height: 100%; }
 .bottom-solo-lectura { opacity: .72; }
 .solo-lectura .cabecera-modulo > .boton-principal,
 .solo-lectura .acciones-entidad,
@@ -2930,6 +2937,7 @@ html.nexoweb-oscuro .vida-especies > em { background: #26333c; border-color: #36
 html.nexoweb-oscuro .miembro-card, html.nexoweb-oscuro .chat-mensaje { background: #26313a; border-color: #3a4650; }
 html.nexoweb-oscuro .miembro-identidad strong { color: #f5f7fa; }
 html.nexoweb-oscuro .boton-notificaciones-chat { background: #17463f; color: #d6fff7; }
+html.nexoweb-oscuro .chat-modal-contenedor { background: #17212b; }
 html.nexoweb-oscuro .chat-mensaje.propio { background: #17463f; }
 html.nexoweb-oscuro .chat-mensaje p { color: #f5f7fa; }
 
@@ -3403,6 +3411,11 @@ html.nexoweb-oscuro .resumen-costos {
   .chat-form { grid-template-columns: minmax(0, 1fr) 46px; padding-bottom: max(2px, env(safe-area-inset-bottom)); }
   .chat-form .boton-principal { width: 46px; }
   .boton-chat-flotante { right: 16px; bottom: 84px; width: 52px; height: 52px; font-size: 22px; }
+  .chat-modal-overlay { place-items: stretch; padding: 0; }
+  .chat-modal-contenedor { width: 100%; height: 100dvh; padding: max(12px, env(safe-area-inset-top)) 10px max(10px, env(safe-area-inset-bottom)); border-radius: 0; }
+  .chat-modal-cerrar { top: max(10px, env(safe-area-inset-top)); right: 10px; }
+  .chat-modal-contenedor .chat-modulo > .cabecera-modulo { margin-bottom: 8px; padding-right: 42px; }
+  .chat-modal-contenedor .chat-pantalla { height: auto; min-height: 0; }
   .miembro-card { align-items: center; flex-direction: row; }
   .miembro-acciones { flex: 0 0 auto; width: auto; }
   .miembro-acciones select { flex: 1; max-width: none; }
