@@ -12,7 +12,7 @@ const SelectorRegistroActividades = lazy(() =>
   import('./ActividadesFinal.jsx').then((modulo) => ({ default: modulo.SelectorRegistroActividades }))
 )
 
-const NEXOWEB_VERSION = '2.0.1'
+const NEXOWEB_VERSION = '2.1.0'
 
 const portadaDefaultAcuario = (tipo = '') => {
   const valor = String(tipo || '').toLowerCase()
@@ -4106,8 +4106,30 @@ function App() {
   useEffect(() => {
     if (!acuarioSeleccionado?.id) return
     revisarMensajesNuevos()
-    const intervalo = window.setInterval(revisarMensajesNuevos, 60000)
-    return () => window.clearInterval(intervalo)
+    const canal = supabase
+      .channel(`mensajes-${acuarioSeleccionado.id}`)
+      .on('postgres_changes', {
+        event: 'INSERT', schema: 'public', table: 'mensajes_acuario',
+        filter: `acuario_id=eq.${acuarioSeleccionado.id}`,
+      }, async ({ new: nuevo }) => {
+        if (nuevo.usuario_id === session?.user?.id) return
+        setMensajesNoLeidos((cantidad) => cantidad + 1)
+        setMensaje(`💬 Nuevo mensaje de ${nuevo.autor_email}.`)
+        if ('Notification' in window && Notification.permission === 'granted') {
+          const registro = await navigator.serviceWorker?.ready
+          registro?.showNotification?.('Nuevo mensaje sobre tu acuario', {
+            body: `${nuevo.autor_email}: ${nuevo.contenido}`,
+            icon: '/icons/nexoweb-192.png', badge: '/icons/nexoweb-192.png',
+            tag: `mensaje-${nuevo.id}`, data: { url: '/' },
+          })
+        }
+      })
+      .subscribe()
+    const respaldo = window.setInterval(revisarMensajesNuevos, 5 * 60 * 1000)
+    return () => {
+      window.clearInterval(respaldo)
+      supabase.removeChannel(canal)
+    }
   }, [acuarioSeleccionado?.id, session?.user?.id])
 
   const renderContenidoEscritorio = () => {
@@ -4486,7 +4508,7 @@ function App() {
             </nav>
           </aside>
 
-          <main className="contenido-escritorio">
+          <main className={`contenido-escritorio ${acuarioSeleccionado.rol_acceso === 'lector' ? 'solo-lectura' : ''}`}>
             <div className="cabecera-escritorio">
               <div>
                 <span className="cabecera-etiqueta">
@@ -4566,13 +4588,13 @@ function App() {
             Agua
           </button>
 
-          <button
+          {acuarioSeleccionado.rol_acceso !== 'lector' ? <button
             className="bottom-agregar"
             onClick={abrirRegistroRapido}
           >
             <span>＋</span>
             Registrar
-          </button>
+          </button> : <button className="bottom-agregar bottom-solo-lectura" disabled><span>👁</span>Consulta</button>}
 
           <button
             className={

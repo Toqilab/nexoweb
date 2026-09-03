@@ -1319,6 +1319,21 @@ function Colaboracion({ acuario, session, onMensaje }) {
 
   useEffect(() => { cargar() }, [acuario.id])
 
+  useEffect(() => {
+    if (!basePreparada) return
+    const canal = supabase
+      .channel(`chat-visible-${acuario.id}`)
+      .on('postgres_changes', {
+        event: 'INSERT', schema: 'public', table: 'mensajes_acuario',
+        filter: `acuario_id=eq.${acuario.id}`,
+      }, ({ new: nuevo }) => {
+        if (new Date(nuevo.expires_at) <= new Date()) return
+        setMensajes((actuales) => actuales.some((item) => item.id === nuevo.id) ? actuales : [...actuales, nuevo].slice(-100))
+      })
+      .subscribe()
+    return () => { supabase.removeChannel(canal) }
+  }, [acuario.id, basePreparada])
+
   const invitar = async (e) => {
     e.preventDefault()
     if (!email.trim()) return
@@ -1342,6 +1357,18 @@ function Colaboracion({ acuario, session, onMensaje }) {
     const { error } = await supabase.from('acuario_miembros').delete().eq('id', miembro.id)
     if (error) onMensaje(`Error: ${error.message}`)
     else { await cargar(); onMensaje('✅ Acceso retirado.') }
+  }
+
+  const cambiarRol = async (miembro, nuevoRol) => {
+    const { error } = await supabase
+      .from('acuario_miembros')
+      .update({ rol: nuevoRol })
+      .eq('id', miembro.id)
+    if (error) onMensaje(`No se pudo cambiar el permiso: ${error.message}`)
+    else {
+      setMiembros((actuales) => actuales.map((item) => item.id === miembro.id ? { ...item, rol: nuevoRol } : item))
+      onMensaje('✅ Permiso actualizado.')
+    }
   }
 
   const enviar = async (e) => {
@@ -1380,7 +1407,10 @@ function Colaboracion({ acuario, session, onMensaje }) {
           {miembros.map((miembro) => (
             <article className="miembro-card" key={miembro.id}>
               <div><strong>{miembro.email}</strong><small>{miembro.rol === 'editor' ? 'Puede ver y registrar información' : 'Solo puede consultar'}</small></div>
-              {esPropietario && <button type="button" className="boton-eliminar-entidad" onClick={() => quitar(miembro)}>Quitar</button>}
+              {esPropietario && <div className="miembro-acciones">
+                <select aria-label={`Permiso de ${miembro.email}`} value={miembro.rol} onChange={(e) => cambiarRol(miembro, e.target.value)}><option value="lector">Solo lectura</option><option value="editor">Colaborador</option></select>
+                <button type="button" className="boton-eliminar-entidad" onClick={() => quitar(miembro)}>Quitar</button>
+              </div>}
             </article>
           ))}
 
